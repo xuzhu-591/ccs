@@ -1,6 +1,6 @@
 [package]
-name = "claude-code-switcher"
-version = "0.2.3"
+name = "ccs-rs"
+version = "0.2.4"
 edition = "2024"
 description = "A fast CLI launcher for Claude Code and Codex with interactive provider selection"
 license = "MIT"

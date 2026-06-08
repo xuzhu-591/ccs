@@ -32,7 +32,7 @@ A fast, single-binary CLI launcher for [Claude Code](https://github.com/anthropi
 ### From crates.io (recommended)
 
 ```bash
-cargo install claude-code-switcher
+cargo install ccs-rs
 ```
 
 ### From source
