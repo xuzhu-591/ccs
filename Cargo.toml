@@ -2,6 +2,11 @@
 name = "ccs"
 version = "0.1.0"
 edition = "2024"
+description = "A fast CLI launcher for Claude Code and Codex with interactive provider selection"
+license = "MIT"
+repository = "https://github.com/xuzhu-591/ccs"
+keywords = ["cli", "claude", "codex", "launcher"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
