@@ -1,6 +1,6 @@
 [package]
-name = "ccs-zx"
-version = "0.2.1"
+name = "ccs-cli"
+version = "0.2.2"
 edition = "2024"
 description = "A fast CLI launcher for Claude Code and Codex with interactive provider selection"
 license = "MIT"
