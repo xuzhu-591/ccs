@@ -32,7 +32,7 @@ A fast, single-binary CLI launcher for [Claude Code](https://github.com/anthropi
 ### From crates.io (recommended)
 
 ```bash
-cargo install ccs
+cargo install ccs-zx
 ```
 
 ### From source
