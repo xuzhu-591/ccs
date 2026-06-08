@@ -1,0 +1,16 @@
+# Build output
+/target/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local dev overrides
+/src/local_providers.toml

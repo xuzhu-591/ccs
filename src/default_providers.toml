@@ -1,0 +1,53 @@
+# ~/.ccs/config.toml
+#
+# ccs provider configuration.
+# Each [[providers]] block defines one selectable entry.
+#
+# Fields:
+#   id                   - Unique identifier; used with the -p / --provider flag
+#   provider             - Display name of the service (shown in column 2)
+#   model                - Model name (shown in column 3)
+#   executable           - Command to launch: "claude" or "codex"
+#   supports_resume      - Whether -r (resume last session) is supported
+#   resume_as_subcommand - If true, resume is passed as a subcommand *before* base_args
+#                          (e.g. `codex resume …`); if false, `-r` is appended after base_args
+#   base_args            - Fixed arguments always passed to the executable
+#   [providers.env]      - Environment variables injected into the subprocess
+
+# ── Example: DeepSeek ─────────────────────────────────────────────────────────
+#
+# Sign up at https://platform.deepseek.com to get your API key.
+
+[[providers]]
+id              = "deepseek"
+provider        = "DeepSeek"
+model           = "deepseek-v4-pro"
+executable      = "claude"
+supports_resume = true
+base_args       = ["--dangerously-skip-permissions"]
+
+[providers.env]
+ANTHROPIC_BASE_URL             = "https://api.deepseek.com/anthropic"
+ANTHROPIC_AUTH_TOKEN           = "YOUR_DEEPSEEK_API_KEY"
+ANTHROPIC_MODEL                = "deepseek-v4-pro"
+ANTHROPIC_DEFAULT_OPUS_MODEL   = "deepseek-v4-pro"
+ANTHROPIC_DEFAULT_SONNET_MODEL = "deepseek-v4-pro"
+ANTHROPIC_DEFAULT_HAIKU_MODEL  = "deepseek-v4-flash"
+CLAUDE_CODE_SUBAGENT_MODEL     = "deepseek-v4-pro"
+CLAUDE_CODE_EFFORT_LEVEL       = "max"
+
+# ── Example: Codex ────────────────────────────────────────────────────────────
+#
+# Requires the `codex` CLI: https://github.com/openai/codex
+
+[[providers]]
+id                   = "codex"
+provider             = "OpenAI"
+model                = "gpt-4o"
+executable           = "codex"
+supports_resume      = true
+resume_as_subcommand = true
+base_args            = ["--dangerously-bypass-approvals-and-sandbox"]
+
+[providers.env]
+OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
