@@ -1,0 +1,36 @@
+.github/workflows/ci.yml
+  7e64d9745626fa53 6,32-41
+CONTRIBUTING.md
+  7e64d9745626fa53 91,96-97,101-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "f37ff663a4edace414df562ed9083cd94fe75378",
+  "prompts": {
+    "7e64d9745626fa53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2e3374a-f124-4ce5-89b6-e9c38952883f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "xuzhu-591 <xuzhu-591@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 32,
+      "total_deletions": 2,
+      "accepted_lines": 32,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "CONTRIBUTING.md": {
+          "additions": 21,
+          "deletions": 2,
+          "accepted_lines": 21
+        },
+        ".github/workflows/ci.yml": {
+          "additions": 11,
+          "accepted_lines": 11
+        }
+      }
+    }
+  }
+}
