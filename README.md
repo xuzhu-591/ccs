@@ -29,6 +29,12 @@ A fast, single-binary CLI launcher for [Claude Code](https://github.com/anthropi
 
 ## Installation
 
+### From crates.io (recommended)
+
+```bash
+cargo install ccs
+```
+
 ### From source
 
 ```bash
