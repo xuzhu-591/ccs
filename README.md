@@ -17,7 +17,7 @@ A fast, single-binary CLI launcher for [Claude Code](https://github.com/anthropi
 - **Direct selection** via `-p <id>` to skip the menu
 - **Resume support** — `-r` maps to `claude -r` or `codex resume` automatically
 - **Dry-run mode** — `-n` prints the exact command and env vars without launching
-- **Config-driven** — add or remove providers by editing `~/.ccs/config.toml`; no recompile needed
+- **Config-driven** — add or remove providers by editing `~/.config/ccs/config.toml`; no recompile needed
 - **Remembers last choice** — the previous selection is highlighted by default
 - **Zero runtime deps** — single static binary, ~1 MB
 
@@ -48,11 +48,11 @@ ccs --version
 
 ## Configuration
 
-On first run, `ccs` generates a template config at `~/.ccs/config.toml`.  
+On first run, `ccs` generates a template config at `~/.config/ccs/config.toml`.  
 Edit it to add your API keys and desired providers.
 
 ```toml
-# ~/.ccs/config.toml
+# ~/.config/ccs/config.toml
 
 [[providers]]
 id              = "deepseek-pro"
@@ -144,7 +144,7 @@ ccs -p deepseek -- --print "explain this code"
 
 ## Adding a custom provider
 
-Add a new `[[providers]]` block to `~/.ccs/config.toml`:
+Add a new `[[providers]]` block to `~/.config/ccs/config.toml`:
 
 ```toml
 [[providers]]

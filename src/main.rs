@@ -12,7 +12,7 @@ const DEFAULT_CONFIG: &str = include_str!("default_providers.toml");
 #[derive(Parser)]
 #[command(
     name = "ccs",
-    about = "Claude Code / Codex 启动工具 🚀\n配置文件: ~/.ccs/config.toml",
+    about = "Claude Code / Codex 启动工具 🚀\n配置文件: ~/.config/ccs/config.toml",
     version
 )]
 struct Args {
@@ -76,10 +76,15 @@ struct Config {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+fn ccs_dir() -> PathBuf {
+    std::env::var("XDG_CONFIG_HOME")
+        .map(|d| PathBuf::from(d).join("ccs"))
+        .or_else(|_| std::env::var("HOME").map(|h| PathBuf::from(h).join(".config").join("ccs")))
+        .unwrap_or_else(|_| PathBuf::from("./ccs-config"))
+}
+
 fn config_path() -> PathBuf {
-    std::env::var("HOME")
-        .map(|h| PathBuf::from(h).join(".ccs").join("config.toml"))
-        .unwrap_or_else(|_| PathBuf::from(".ccs-config.toml"))
+    ccs_dir().join("config.toml")
 }
 
 fn parse_config(content: &str) -> Result<Config, toml::de::Error> {
@@ -121,9 +126,7 @@ fn load_providers() -> Vec<Provider> {
 // ── Last-used persistence ─────────────────────────────────────────────────────
 
 fn last_id_path() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(|h| PathBuf::from(h).join(".ccs").join("last"))
+    Some(ccs_dir().join("last"))
 }
 
 fn read_last_id() -> Option<String> {

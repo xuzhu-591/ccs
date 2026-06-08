@@ -1,4 +1,4 @@
-# ~/.ccs/config.toml
+# ~/.config/ccs/config.toml
 #
 # ccs provider configuration.
 # Each [[providers]] block defines one selectable entry.
