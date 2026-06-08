@@ -1,0 +1,49 @@
+src/main.rs
+  8f8f7cc76109dbf6 36,52,72,85-88,108,170,172-177,179-181,184,187,189-190,193-218,221-222,225,228-231,235,239-241,243-245,248,289-290,321-587
+.github/workflows/ci.yml
+  8f8f7cc76109dbf6 1-32
+CONTRIBUTING.md
+  8f8f7cc76109dbf6 47,49-72,74-98,103-104,107
+Cargo.toml
+  8f8f7cc76109dbf6 5-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "4bb5086e9d03c72c9ae8980c39de78e5c4e99794",
+  "prompts": {
+    "8f8f7cc76109dbf6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17ed7778-fbf7-422f-997f-4527621f8ca4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "xuzhu-591 <xuzhu-591@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 432,
+      "total_deletions": 61,
+      "accepted_lines": 428,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        ".github/workflows/ci.yml": {
+          "additions": 32,
+          "accepted_lines": 32
+        },
+        "Cargo.toml": {
+          "additions": 5,
+          "accepted_lines": 5
+        },
+        "src/main.rs": {
+          "additions": 342,
+          "deletions": 50,
+          "accepted_lines": 338
+        },
+        "CONTRIBUTING.md": {
+          "additions": 53,
+          "deletions": 11,
+          "accepted_lines": 53
+        }
+      }
+    }
+  }
+}
