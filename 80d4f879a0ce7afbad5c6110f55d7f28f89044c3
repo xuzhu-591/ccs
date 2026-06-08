@@ -1,0 +1,29 @@
+README.md
+  7e64d9745626fa53 55-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "80d4f879a0ce7afbad5c6110f55d7f28f89044c3",
+  "prompts": {
+    "7e64d9745626fa53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2e3374a-f124-4ce5-89b6-e9c38952883f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "xuzhu-591 <xuzhu-591@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 0,
+      "accepted_lines": 16,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "README.md": {
+          "additions": 16,
+          "accepted_lines": 16
+        }
+      }
+    }
+  }
+}
