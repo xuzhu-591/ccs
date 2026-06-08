@@ -1,0 +1,28 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "8380202b5155d1416561916bcabdbf9924dc09ee",
+  "prompts": {
+    "7e64d9745626fa53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2e3374a-f124-4ce5-89b6-e9c38952883f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "xuzhu-591 <xuzhu-591@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 1,
+      "accepted_lines": 5,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "Cargo.toml": {
+          "additions": 5,
+          "deletions": 1,
+          "accepted_lines": 5
+        }
+      }
+    }
+  }
+}
