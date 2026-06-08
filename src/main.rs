@@ -285,10 +285,7 @@ fn main() {
                 .map(|p| p.provider.len())
                 .max()
                 .unwrap_or(8);
-            eprintln!(
-                "  {:<exe_w$}   {:<prov_w$}   MODEL",
-                "TOOL", "PROVIDER"
-            );
+            eprintln!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER");
         }
 
         let selection = Select::with_theme(&ColorfulTheme::default())
