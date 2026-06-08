@@ -52,6 +52,22 @@ cp target/release/ccs ~/.local/bin/   # or any directory in $PATH
 ccs --version
 ```
 
+### Updating
+
+With [cargo-update](https://github.com/nabijaczleweli/cargo-update) (recommended):
+
+```bash
+cargo install cargo-update
+cargo install-update ccs-rs   # update ccs-rs only
+# cargo install-update -a     # or update all installed crates
+```
+
+Without extra tools:
+
+```bash
+cargo install ccs-rs --force
+```
+
 ## Configuration
 
 On first run, `ccs` generates a template config at `~/.config/ccs/config.toml`.  
