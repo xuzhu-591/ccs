@@ -1,0 +1,36 @@
+rust-toolchain.toml
+  8f8f7cc76109dbf6 1-3
+.github/workflows/ci.yml
+  8f8f7cc76109dbf6 17,19,30-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "097903e397853d1acd7c25f35819826fdb4612da",
+  "prompts": {
+    "8f8f7cc76109dbf6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17ed7778-fbf7-422f-997f-4527621f8ca4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "xuzhu-591 <xuzhu-591@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 3,
+      "accepted_lines": 8,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "rust-toolchain.toml": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        ".github/workflows/ci.yml": {
+          "additions": 5,
+          "deletions": 3,
+          "accepted_lines": 5
+        }
+      }
+    }
+  }
+}
