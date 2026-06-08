@@ -65,6 +65,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
+name = "ccs-rs"
+version = "0.2.4"
+dependencies = [
+ "clap",
+ "dialoguer",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -109,16 +119,6 @@ name = "clap_lex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
-
-[[package]]
-name = "claude-code-switcher"
-version = "0.2.3"
-dependencies = [
- "clap",
- "dialoguer",
- "serde",
- "toml",
-]
 
 [[package]]
 name = "colorchoice"
