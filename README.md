@@ -4,7 +4,7 @@ A fast, single-binary CLI launcher for [Claude Code](https://github.com/anthropi
 
 ```
   TOOL     PROVIDER   MODEL
-? 选择 ›
+? Select ›
 ❯ claude   DeepSeek   deepseek-v4-pro
   claude   DeepSeek   deepseek-v4-flash
   claude   Mimo       mimo-v2.5-pro

@@ -12,23 +12,23 @@ const DEFAULT_CONFIG: &str = include_str!("default_providers.toml");
 #[derive(Parser)]
 #[command(
     name = "ccs",
-    about = "Claude Code / Codex 启动工具 🚀\n配置文件: ~/.config/ccs/config.toml",
+    about = "Claude Code / Codex launcher 🚀\nConfig: ~/.config/ccs/config.toml",
     version
 )]
 struct Args {
-    /// 继续上次会话（传递 -r 给 claude）
+    /// Resume the last session (passes -r to claude)
     #[arg(short = 'r', long = "resume")]
     resume: bool,
 
-    /// 直接指定提供商 ID，跳过交互式选择
+    /// Skip the menu and use a specific provider ID
     #[arg(short = 'p', long = "provider", value_name = "ID")]
     provider: Option<String>,
 
-    /// 打印将要执行的命令，但不实际启动（调试用）
+    /// Print the command that would run, without executing
     #[arg(short = 'n', long = "dry-run")]
     dry_run: bool,
 
-    /// 透传给 claude/codex 的额外参数
+    /// Arguments passed through to claude/codex
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     passthrough: Vec<String>,
 }
@@ -99,24 +99,24 @@ fn load_providers() -> Vec<Provider> {
             let _ = fs::create_dir_all(parent);
         }
         if let Err(e) = fs::write(&path, DEFAULT_CONFIG) {
-            eprintln!("⚠️  无法写入默认配置 {}: {e}", path.display());
+            eprintln!("⚠️  Failed to write default config {}: {e}", path.display());
         } else {
-            eprintln!("📝 已生成默认配置: {}\n", path.display());
+            eprintln!("📝 Default config created: {}\n", path.display());
         }
     }
 
     let content = fs::read_to_string(&path).unwrap_or_else(|e| {
-        eprintln!("❌ 无法读取配置文件 {}: {e}", path.display());
+        eprintln!("❌ Failed to read config {}: {e}", path.display());
         std::process::exit(1);
     });
 
     let config: Config = parse_config(&content).unwrap_or_else(|e| {
-        eprintln!("❌ 配置解析失败 ({}): {e}", path.display());
+        eprintln!("❌ Failed to parse config ({}): {e}", path.display());
         std::process::exit(1);
     });
 
     if config.providers.is_empty() {
-        eprintln!("❌ 配置文件中没有任何提供商定义");
+        eprintln!("❌ No providers defined in config");
         std::process::exit(1);
     }
 
@@ -218,7 +218,7 @@ fn shell_quote(s: &str) -> String {
 
 fn launch(entry: &Provider, resume: bool, dry_run: bool, passthrough: &[String]) -> ! {
     if resume && !entry.supports_resume {
-        eprintln!("⚠️  `{}` 不支持 resume，已忽略", entry.id);
+        eprintln!("⚠️  `{}` does not support resume, ignoring", entry.id);
     }
 
     let cmd_info = build_launch_cmd(entry, resume, passthrough);
@@ -248,7 +248,7 @@ fn launch(entry: &Provider, resume: bool, dry_run: bool, passthrough: &[String])
     }
 
     let err = cmd.exec();
-    eprintln!("❌ 无法启动 {}: {err}", cmd_info.binary);
+    eprintln!("❌ Failed to launch {}: {err}", cmd_info.binary);
     std::process::exit(1);
 }
 
@@ -262,9 +262,9 @@ fn main() {
         match providers.iter().find(|p| p.id == *id) {
             Some(p) => p.clone(),
             None => {
-                eprintln!("❌ 未知 ID: {id}");
+                eprintln!("❌ Unknown provider ID: {id}");
                 let ids: Vec<&str> = providers.iter().map(|p| p.id.as_str()).collect();
-                eprintln!("可用 ID: {}", ids.join(", "));
+                eprintln!("Available IDs: {}", ids.join(", "));
                 std::process::exit(1);
             }
         }
@@ -292,7 +292,7 @@ fn main() {
         }
 
         let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("选择")
+            .with_prompt("Select")
             .items(&items)
             .default(default_idx)
             .interact_opt()
@@ -301,7 +301,7 @@ fn main() {
         match selection {
             Some(idx) => providers[idx].clone(),
             None => {
-                eprintln!("已取消");
+                eprintln!("Cancelled");
                 std::process::exit(0);
             }
         }
