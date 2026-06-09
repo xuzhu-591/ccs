@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-09
+
 ### Changed
 - CLI prompts and messages switched from Chinese to English for consistency with documentation.
 
@@ -63,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/xuzhu-591/ccs/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/xuzhu-591/ccs/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/xuzhu-591/ccs/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/xuzhu-591/ccs/compare/v0.2.2...v0.2.3
