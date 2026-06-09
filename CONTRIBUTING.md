@@ -57,6 +57,16 @@ All logic lives in `src/main.rs`:
 | `launch` | Thin exec() wrapper |
 | `main` | Glue: parse → select → launch |
 
+## Security
+
+After adding or updating dependencies, run:
+
+```bash
+cargo audit
+```
+
+This checks your `Cargo.lock` against the [RustSec Advisory Database](https://rustsec.org/) for known vulnerabilities. It is also enforced in CI — PRs with vulnerable dependencies will be blocked.
+
 ## Testing
 
 ### Running tests
@@ -93,24 +103,27 @@ GitHub Actions runs on every push to `main`, every tag `v*`, and every PR:
 - `cargo fmt --check` — formatting
 - `cargo clippy -- -D warnings` — lints
 - `cargo test` — unit tests
+- `cargo audit` — dependency vulnerability check
 - `cargo build --release` — ensures release build compiles (Linux + macOS)
 - **publish** — on tag push (`v*`), automatically publishes to crates.io
+- **release** — on tag push (`v*`), creates a GitHub Release with changelog notes
 
 CI must be green before merge.
 
 ## Release process
 
-1. Bump the version in `Cargo.toml` (and update `Cargo.lock` — `cargo build` will do this).
-2. Merge the version bump PR to `main`.
-3. Tag and push:
+1. Add a changelog entry in `CHANGELOG.md` under a new version heading.
+2. Bump the version in `Cargo.toml` (and update `Cargo.lock` — `cargo build` will do this).
+3. Merge the version bump PR to `main`.
+4. Tag and push:
 
 ```bash
 git checkout main && git pull
-git tag v0.2.5
-git push origin v0.2.5
+git tag v0.2.6
+git push origin v0.2.6
 ```
 
-4. CI will build, test, and publish to [crates.io](https://crates.io/crates/ccs-rs) automatically.
+5. CI will build, test, publish to [crates.io](https://crates.io/crates/ccs-rs), and create a GitHub Release with the changelog entry automatically.
 
 ### Prerequisites
 
