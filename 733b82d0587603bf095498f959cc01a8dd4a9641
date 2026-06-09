@@ -1,0 +1,37 @@
+Cargo.toml
+  80432dbf4faf9436 3
+CHANGELOG.md
+  80432dbf4faf9436 10-11,68-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "733b82d0587603bf095498f959cc01a8dd4a9641",
+  "prompts": {
+    "80432dbf4faf9436": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68ce170a-813e-44f1-8841-3395c687dabf",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 2,
+      "accepted_lines": 5,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "Cargo.toml": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "CHANGELOG.md": {
+          "additions": 4,
+          "deletions": 1,
+          "accepted_lines": 4
+        }
+      }
+    }
+  }
+}
