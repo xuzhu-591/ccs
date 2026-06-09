@@ -1,0 +1,56 @@
+src/main.rs
+  80432dbf4faf9436 15,19,23,27,31,102,104,109,114,119,221,251,265,267,295,304
+.github/workflows/ci.yml
+  80432dbf4faf9436 23-26,48-71
+README.md
+  80432dbf4faf9436 7
+CHANGELOG.md
+  80432dbf4faf9436 1-73
+CONTRIBUTING.md
+  80432dbf4faf9436 60-69,106,109,115-118,122-123,126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "e71eb477a18e42577be791bd99bedd7c381b1f72",
+  "prompts": {
+    "80432dbf4faf9436": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68ce170a-813e-44f1-8841-3395c687dabf",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 137,
+      "total_deletions": 23,
+      "accepted_lines": 137,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        ".github/workflows/ci.yml": {
+          "additions": 28,
+          "accepted_lines": 28
+        },
+        "README.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "CHANGELOG.md": {
+          "additions": 73,
+          "accepted_lines": 73
+        },
+        "CONTRIBUTING.md": {
+          "additions": 19,
+          "deletions": 6,
+          "accepted_lines": 19
+        },
+        "src/main.rs": {
+          "additions": 16,
+          "deletions": 16,
+          "accepted_lines": 16
+        }
+      }
+    }
+  }
+}
