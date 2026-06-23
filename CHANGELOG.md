@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-23
+
+### Added
+- `list` subcommand to print all configured providers (with masked env).
+- `validate` subcommand to check that each provider's executable exists in PATH.
+- `edit` subcommand to open `config.toml` in `$EDITOR` (falls back to `vi`).
+- `--show-secrets` flag to opt out of secret masking in `dry-run` / `list` output.
+- Remember the last 3 used provider IDs (LRU) and default the menu cursor to the most recent one.
+
+### Security
+- Mask env values whose key contains `token`, `key`, `secret`, or `password` (case-insensitive) in `--dry-run` and `list` output by default. Output renders as `***masked (len=N)***` to avoid leaking API keys when sharing logs.
+
 ## [0.2.6] - 2026-06-09
 
 ### Changed
@@ -65,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/xuzhu-591/ccs/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/xuzhu-591/ccs/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/xuzhu-591/ccs/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/xuzhu-591/ccs/compare/v0.2.3...v0.2.4
