@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use dialoguer::{Select, theme::ColorfulTheme};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -9,6 +9,12 @@ use std::process::Command;
 
 const DEFAULT_CONFIG: &str = include_str!("default_providers.toml");
 
+/// Max number of recently-used provider ids remembered.
+const RECENT_MAX: usize = 3;
+
+/// Env-key substrings (case-insensitive) whose values are masked by default.
+const MASK_KEYWORDS: &[&str] = &["token", "key", "secret", "password"];
+
 #[derive(Parser)]
 #[command(
     name = "ccs",
@@ -16,6 +22,9 @@ const DEFAULT_CONFIG: &str = include_str!("default_providers.toml");
     version
 )]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
     /// Resume the last session (passes -r to claude)
     #[arg(short = 'r', long = "resume")]
     resume: bool,
@@ -28,9 +37,23 @@ struct Args {
     #[arg(short = 'n', long = "dry-run")]
     dry_run: bool,
 
+    /// Show full secret values in dry-run / list output (default: masked)
+    #[arg(long = "show-secrets")]
+    show_secrets: bool,
+
     /// Arguments passed through to claude/codex
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     passthrough: Vec<String>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// List all configured providers
+    List,
+    /// Validate config and check that executables exist in PATH
+    Validate,
+    /// Open the config file in $EDITOR (falls back to vi)
+    Edit,
 }
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
@@ -123,29 +146,53 @@ fn load_providers() -> Vec<Provider> {
     config.providers
 }
 
-// ── Last-used persistence ─────────────────────────────────────────────────────
+// ── Recent selection ──────────────────────────────────────────────────────────
 
-fn last_id_path() -> Option<PathBuf> {
-    Some(ccs_dir().join("last"))
+fn recent_path() -> PathBuf {
+    ccs_dir().join("recent")
 }
 
-fn read_last_id() -> Option<String> {
-    let path = last_id_path()?;
-    fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+/// Pure LRU update used by `push_recent`; testable without touching disk.
+fn update_recent_list(mut list: Vec<String>, id: &str) -> Vec<String> {
+    list.retain(|x| x != id);
+    list.insert(0, id.to_string());
+    list.truncate(RECENT_MAX);
+    list
 }
 
-fn save_last_id(id: &str) {
-    if let Some(path) = last_id_path() {
-        if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        let _ = fs::write(path, id);
+fn read_recent() -> Vec<String> {
+    let Ok(content) = fs::read_to_string(recent_path()) else {
+        return Vec::new();
+    };
+    content
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .take(RECENT_MAX)
+        .map(str::to_string)
+        .collect()
+}
+
+fn push_recent(id: &str) {
+    let path = recent_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
     }
+    let mut list = read_recent();
+    list = update_recent_list(list, id);
+    let body = if list.is_empty() {
+        String::new()
+    } else {
+        list.join("\n") + "\n"
+    };
+    let _ = fs::write(path, body);
 }
 
 // ── Display formatting ────────────────────────────────────────────────────────
 
-fn build_menu_items(providers: &[Provider]) -> Vec<String> {
+/// Compute column widths for the interactive menu / list table.
+/// Returns `(exe_w, prov_w)` — the longest executable-name and provider-name lengths.
+fn compute_widths(providers: &[Provider]) -> (usize, usize) {
     let exe_w = providers
         .iter()
         .map(|p| p.executable.as_str().len())
@@ -156,6 +203,11 @@ fn build_menu_items(providers: &[Provider]) -> Vec<String> {
         .map(|p| p.provider.len())
         .max()
         .unwrap_or(8);
+    (exe_w, prov_w)
+}
+
+fn build_menu_items(providers: &[Provider]) -> Vec<String> {
+    let (exe_w, prov_w) = compute_widths(providers);
 
     providers
         .iter()
@@ -168,6 +220,21 @@ fn build_menu_items(providers: &[Provider]) -> Vec<String> {
             )
         })
         .collect()
+}
+
+// ── Secret masking ────────────────────────────────────────────────────────────
+
+fn is_sensitive_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    MASK_KEYWORDS.iter().any(|kw| lower.contains(kw))
+}
+
+fn mask_value(key: &str, value: &str) -> String {
+    if is_sensitive_key(key) {
+        format!("***masked (len={})***", value.chars().count())
+    } else {
+        value.to_string()
+    }
 }
 
 // ── Command building ─────────────────────────────────────────────────────────
@@ -216,7 +283,13 @@ fn shell_quote(s: &str) -> String {
 
 // ── Launch ────────────────────────────────────────────────────────────────────
 
-fn launch(entry: &Provider, resume: bool, dry_run: bool, passthrough: &[String]) -> ! {
+fn launch(
+    entry: &Provider,
+    resume: bool,
+    dry_run: bool,
+    show_secrets: bool,
+    passthrough: &[String],
+) -> ! {
     if resume && !entry.supports_resume {
         eprintln!("⚠️  `{}` does not support resume, ignoring", entry.id);
     }
@@ -226,7 +299,12 @@ fn launch(entry: &Provider, resume: bool, dry_run: bool, passthrough: &[String])
     if dry_run {
         eprintln!("[dry-run] env:");
         for (k, v) in &cmd_info.env {
-            eprintln!("  {}={}", k, v);
+            let display = if show_secrets {
+                v.clone()
+            } else {
+                mask_value(k, v)
+            };
+            eprintln!("  {}={}", k, display);
         }
         let args_str = cmd_info
             .args
@@ -252,10 +330,117 @@ fn launch(entry: &Provider, resume: bool, dry_run: bool, passthrough: &[String])
     std::process::exit(1);
 }
 
+// ── Subcommands ───────────────────────────────────────────────────────────────
+
+fn cmd_list(providers: &[Provider], show_secrets: bool) {
+    let (exe_w, prov_w) = compute_widths(providers);
+    let id_w = providers
+        .iter()
+        .map(|p| p.id.len())
+        .max()
+        .unwrap_or(2)
+        .max("ID".len());
+    let model_w = providers
+        .iter()
+        .map(|p| p.model.len())
+        .max()
+        .unwrap_or(5)
+        .max("MODEL".len());
+
+    println!(
+        "{:<id_w$}  {:<exe_w$}  {:<prov_w$}  {:<model_w$}  RESUME",
+        "ID", "TOOL", "PROVIDER", "MODEL"
+    );
+    for p in providers {
+        println!(
+            "{:<id_w$}  {:<exe_w$}  {:<prov_w$}  {:<model_w$}  {}",
+            p.id,
+            p.executable.as_str(),
+            p.provider,
+            p.model,
+            if p.supports_resume { "yes" } else { "no" },
+        );
+    }
+
+    let with_env: Vec<&Provider> = providers.iter().filter(|p| !p.env.is_empty()).collect();
+    if !with_env.is_empty() {
+        let label = if show_secrets {
+            "env:"
+        } else {
+            "env (masked; pass --show-secrets to reveal):"
+        };
+        println!("\n{}", label);
+        for p in with_env {
+            println!("  [{}]", p.id);
+            let mut env: Vec<(&String, &String)> = p.env.iter().collect();
+            env.sort_by(|a, b| a.0.cmp(b.0));
+            for (k, v) in env {
+                let display = if show_secrets {
+                    v.clone()
+                } else {
+                    mask_value(k, v)
+                };
+                println!("    {}={}", k, display);
+            }
+        }
+    }
+}
+
+fn cmd_validate(providers: &[Provider]) -> i32 {
+    let mut ok = true;
+    for p in providers {
+        let exe = p.executable.as_str();
+        match Command::new("which").arg(exe).output() {
+            Ok(out) if out.status.success() => {
+                let path = String::from_utf8_lossy(&out.stdout);
+                let path = path.trim();
+                println!("✓ {:<20} {} ({})", p.id, exe, path);
+            }
+            _ => {
+                println!("✗ {:<20} {} — NOT FOUND in PATH", p.id, exe);
+                ok = false;
+            }
+        }
+    }
+    if ok { 0 } else { 1 }
+}
+
+fn cmd_edit() -> std::io::Result<()> {
+    let path = config_path();
+    if !path.exists() {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, DEFAULT_CONFIG)?;
+        eprintln!("📝 Default config created: {}\n", path.display());
+    }
+    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+    let status = Command::new(&editor).arg(&path).status()?;
+    std::process::exit(status.code().unwrap_or(1));
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
     let args = Args::parse();
+
+    match args.command {
+        Some(Commands::List) => {
+            let providers = load_providers();
+            cmd_list(&providers, args.show_secrets);
+            std::process::exit(0);
+        }
+        Some(Commands::Validate) => {
+            let providers = load_providers();
+            std::process::exit(cmd_validate(&providers));
+        }
+        Some(Commands::Edit) => {
+            let _ = cmd_edit();
+            return;
+        }
+        None => {}
+    }
+
     let providers = load_providers();
 
     let entry = if let Some(ref id) = args.provider {
@@ -269,34 +454,29 @@ fn main() {
             }
         }
     } else {
-        let last = read_last_id();
-        let default_idx = last
-            .as_deref()
-            .and_then(|id| providers.iter().position(|p| p.id == id))
+        let recent = read_recent();
+        let default_idx = recent
+            .first()
+            .and_then(|id| providers.iter().position(|p| p.id == *id))
             .unwrap_or(0);
 
         let items = build_menu_items(&providers);
 
-        if !providers.is_empty() {
-            let exe_w = providers
-                .iter()
-                .map(|p| p.executable.as_str().len())
-                .max()
-                .unwrap_or(6);
-            let prov_w = providers
-                .iter()
-                .map(|p| p.provider.len())
-                .max()
-                .unwrap_or(8);
-            eprintln!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER");
-        }
+        let (exe_w, prov_w) = compute_widths(&providers);
+        eprintln!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER");
 
-        let selection = Select::with_theme(&ColorfulTheme::default())
+        let selection = match Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Select")
             .items(&items)
             .default(default_idx)
             .interact_opt()
-            .unwrap_or(None);
+        {
+            Ok(opt) => opt,
+            Err(dialoguer::Error::IO(io_err)) => {
+                eprintln!("❌ I/O error during selection: {io_err}");
+                std::process::exit(1);
+            }
+        };
 
         match selection {
             Some(idx) => providers[idx].clone(),
@@ -307,7 +487,7 @@ fn main() {
         }
     };
 
-    save_last_id(&entry.id);
+    push_recent(&entry.id);
     if !args.dry_run {
         eprintln!(
             "🚀 {} / {} / {}",
@@ -316,7 +496,13 @@ fn main() {
             entry.model
         );
     }
-    launch(&entry, args.resume, args.dry_run, &args.passthrough);
+    launch(
+        &entry,
+        args.resume,
+        args.dry_run,
+        args.show_secrets,
+        &args.passthrough,
+    );
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -584,5 +770,113 @@ executable = "claude"
     fn shell_quote_with_special_chars() {
         assert_eq!(shell_quote("a=b"), "'a=b'");
         assert_eq!(shell_quote("{json}"), "'{json}'");
+    }
+
+    // ── Secret masking ───────────────────────────────────────────────────────
+
+    #[test]
+    fn mask_value_plain_keys() {
+        assert_eq!(mask_value("ANTHROPIC_BASE_URL", "https://x"), "https://x");
+        assert_eq!(mask_value("CLAUDE_CODE_EFFORT_LEVEL", "max"), "max");
+        assert_eq!(mask_value("REGION", "us-east-1"), "us-east-1");
+    }
+
+    #[test]
+    fn mask_value_token_substring() {
+        let secret = "sk-1234567890abcdef"; // 19 chars
+        let masked = mask_value("ANTHROPIC_AUTH_TOKEN", secret);
+        assert!(masked.starts_with("***masked"));
+        assert!(masked.contains("len=19"));
+        assert!(!masked.contains("sk-"));
+        assert!(!masked.contains("1234567890"));
+    }
+
+    #[test]
+    fn mask_value_key_substring_case_insensitive() {
+        assert!(mask_value("openai_api_key", "secret").contains("masked"));
+        assert!(mask_value("MIMO_API_KEY", "secret").contains("masked"));
+        assert!(mask_value("API_KEY", "x").contains("masked"));
+        assert!(mask_value("private-key", "x").contains("masked"));
+    }
+
+    #[test]
+    fn mask_value_secret_and_password() {
+        assert!(mask_value("DB_PASSWORD", "hunter2").contains("masked"));
+        assert!(mask_value("client_secret", "x").contains("masked"));
+        assert!(mask_value("SecretKey", "x").contains("masked"));
+    }
+
+    #[test]
+    fn mask_value_no_match() {
+        assert_eq!(mask_value("PATH", "/usr/bin"), "/usr/bin");
+        assert_eq!(mask_value("HOME", "/root"), "/root");
+        assert_eq!(mask_value("LANG", "en_US"), "en_US");
+    }
+
+    // ── compute_widths ───────────────────────────────────────────────────────
+
+    #[test]
+    fn compute_widths_multi() {
+        let providers = vec![
+            make_provider("a", Executable::Claude, false, false),
+            Provider {
+                id: "b".to_string(),
+                provider: "OpenAI".to_string(),
+                model: "gpt-4o".to_string(),
+                executable: Executable::Codex,
+                supports_resume: false,
+                resume_as_subcommand: false,
+                base_args: vec![],
+                env: HashMap::new(),
+            },
+        ];
+        let (exe_w, prov_w) = compute_widths(&providers);
+        // claude (6) > codex (5), so width is 6
+        assert_eq!(exe_w, "claude".len());
+        // "TestProvider" (12) > "OpenAI" (5)
+        assert_eq!(prov_w, "TestProvider".len());
+    }
+
+    #[test]
+    fn compute_widths_empty() {
+        let (exe_w, prov_w) = compute_widths(&[]);
+        assert_eq!(exe_w, 6); // "claude".len()
+        assert_eq!(prov_w, 8); // "PROVIDER".len() default fallback
+    }
+
+    // ── Recent list (pure) ───────────────────────────────────────────────────
+
+    #[test]
+    fn recent_empty_push() {
+        let r = update_recent_list(vec![], "a");
+        assert_eq!(r, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn recent_dedupe_push_to_front() {
+        let r = update_recent_list(vec!["a".into(), "b".into()], "a");
+        assert_eq!(r, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn recent_dedupe_in_middle() {
+        let r = update_recent_list(vec!["c".into(), "a".into(), "b".into()], "a");
+        assert_eq!(r, vec!["a".to_string(), "c".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn recent_cap_at_three() {
+        let r = update_recent_list(vec!["a".into(), "b".into(), "c".into()], "d");
+        assert_eq!(r, vec!["d".to_string(), "a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn recent_cap_after_dedupe() {
+        // "b" already present, push "b" again, then a new one — must stay ≤ 3
+        let r = update_recent_list(vec!["b".into(), "a".into(), "c".into()], "b");
+        assert_eq!(r.len(), 3);
+        assert_eq!(r[0], "b");
+        assert!(r.contains(&"a".to_string()));
+        assert!(r.contains(&"c".to_string()));
     }
 }
