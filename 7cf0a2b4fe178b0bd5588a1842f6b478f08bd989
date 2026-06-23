@@ -1,0 +1,37 @@
+CHANGELOG.md
+  28bf861ebb21eb40 10-21,80-81
+Cargo.toml
+  28bf861ebb21eb40 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "7cf0a2b4fe178b0bd5588a1842f6b478f08bd989",
+  "prompts": {
+    "28bf861ebb21eb40": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a2374583-9bbf-4f26-958a-3783cffc4758",
+        "model": "MiniMax-M3"
+      },
+      "human_author": "xuzhu-591",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 2,
+      "accepted_lines": 15,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "CHANGELOG.md": {
+          "additions": 14,
+          "deletions": 1,
+          "accepted_lines": 14
+        },
+        "Cargo.toml": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        }
+      }
+    }
+  }
+}
