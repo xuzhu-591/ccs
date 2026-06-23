@@ -119,6 +119,12 @@ CLAUDE_CODE_EFFORT_LEVEL       = "max"
 
 ```
 Usage: ccs [OPTIONS] [PASSTHROUGH]...
+       ccs <COMMAND>
+
+Commands:
+  list      List all configured providers
+  validate  Validate config and check executables in PATH
+  edit      Open the config file in $EDITOR (falls back to vi)
 
 Arguments:
   [PASSTHROUGH]...  Arguments passed through to claude/codex
@@ -127,6 +133,7 @@ Options:
   -r, --resume         Resume the last session
   -p, --provider <ID>  Skip the menu and use a specific provider ID
   -n, --dry-run        Print the command that would run, without executing
+      --show-secrets   Reveal masked secret values in dry-run / list output
   -h, --help           Print help
   -V, --version        Print version
 ```
@@ -149,15 +156,40 @@ ccs -p deepseek-pro -r
 # Debug: see exactly what command would be executed
 ccs -p codex -r -n
 
+# Reveal the real API key in dry-run output (default is masked)
+ccs -p deepseek -n --show-secrets
+
 # Pass extra arguments to the underlying tool
 ccs -p deepseek -- --print "explain this code"
+
+# Inspect all configured providers
+ccs list
+
+# Make sure every provider's executable is in PATH
+ccs validate
+
+# Edit your config in $EDITOR (falls back to vi)
+ccs edit
 ```
+
+### Recent selections
+
+ccs remembers the **last 3** provider IDs you used and defaults the menu cursor
+to the most recent one. The list is stored as plain lines (newest first) in
+`~/.config/ccs/recent`.
+
+### Secret masking
+
+By default, `--dry-run` and `ccs list` mask values whose env-key contains any of
+`token`, `key`, `secret`, or `password` (case-insensitive). The output looks
+like `***masked (len=42)***` so you can paste logs without leaking keys. Pass
+`--show-secrets` to reveal the real value.
 
 ### Dry-run output example
 
 ```
 [dry-run] env:
-  ANTHROPIC_AUTH_TOKEN=sk-...
+  ANTHROPIC_AUTH_TOKEN=***masked (len=19)***
   ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
   ...
 [dry-run] cmd:
