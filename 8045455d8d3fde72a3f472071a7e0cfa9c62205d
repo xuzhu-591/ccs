@@ -1,0 +1,37 @@
+README.md
+  28bf861ebb21eb40 122,124-127,136,159-161,164-172,175-186,192
+src/main.rs
+  28bf861ebb21eb40 1,12-17,25-27,40-43,49-56,149,151-152,155-160,163-179,181-188,193-195,201-206,221-235,282-288,298-299,325-374,377-413,418-435,449-452,457-458,460,465-471,482,491-497,766-883
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "cc1a246bdf33825ea3c9de6449c313ba95dd0315",
+  "prompts": {
+    "28bf861ebb21eb40": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a2374583-9bbf-4f26-958a-3783cffc4758",
+        "model": "MiniMax-M3"
+      },
+      "human_author": "xuzhu-591",
+      "messages": [],
+      "total_additions": 389,
+      "total_deletions": 62,
+      "accepted_lines": 372,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "src/main.rs": {
+          "additions": 356,
+          "deletions": 61,
+          "accepted_lines": 339
+        },
+        "README.md": {
+          "additions": 33,
+          "deletions": 1,
+          "accepted_lines": 33
+        }
+      }
+    }
+  }
+}
