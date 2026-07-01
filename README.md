@@ -3,17 +3,18 @@
 A fast, single-binary CLI launcher for [Claude Code](https://github.com/anthropics/claude-code) and [Codex](https://github.com/openai/codex) that lets you **interactively select a model provider** before each session — no more juggling shell aliases.
 
 ```
+Select provider
+[Recent]   All     ←/→ switch list, ↑/↓ move, Enter select, Esc cancel
+
   TOOL     PROVIDER   MODEL
-? Select ›
-❯ claude   DeepSeek   deepseek-v4-pro
+> claude   DeepSeek   deepseek-v4-pro
   claude   DeepSeek   deepseek-v4-flash
   claude   Mimo       mimo-v2.5-pro
-  codex    OpenAI     gpt-4o
 ```
 
 ## Features
 
-- **Interactive three-column menu** — tool / provider / model, navigated with arrow keys
+- **Interactive three-column menu** — tool / provider / model, with Recent / All lists switched by left and right arrows
 - **Direct selection** via `-p <id>` to skip the menu
 - **Resume support** — `-r` maps to `claude -r` or `codex resume` automatically
 - **Dry-run mode** — `-n` prints the exact command and env vars without launching
@@ -174,9 +175,10 @@ ccs edit
 
 ### Recent selections
 
-ccs remembers the **last 3** provider IDs you used and defaults the menu cursor
-to the most recent one. The list is stored as plain lines (newest first) in
-`~/.config/ccs/recent`.
+ccs remembers the **last 3** provider IDs you used and shows them in a
+dedicated Recent list. The menu defaults to the most recent provider, and left
+and right arrows switch between Recent and All providers. The list is stored as
+plain lines (newest first) in `~/.config/ccs/recent`.
 
 ### Secret masking
 

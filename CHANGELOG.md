@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-07-01
+
+### Added
+- Interactive provider selection now has Recent and All lists, switchable with left and right arrows.
+
 ## [0.2.7] - 2026-06-23
 
 ### Added
@@ -77,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/xuzhu-591/ccs/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/xuzhu-591/ccs/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/xuzhu-591/ccs/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/xuzhu-591/ccs/compare/v0.2.4...v0.2.5
