@@ -1,6 +1,6 @@
 [package]
 name = "ccs-rs"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 description = "A fast CLI launcher for Claude Code and Codex with interactive provider selection"
 license = "MIT"
@@ -14,6 +14,6 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-dialoguer = "0.11"
+crossterm = { version = "0.29.0", default-features = false, features = ["events"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"

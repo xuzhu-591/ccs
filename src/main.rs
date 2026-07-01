@@ -1,8 +1,14 @@
 use clap::{Parser, Subcommand};
-use dialoguer::{Select, theme::ColorfulTheme};
+use crossterm::{
+    cursor,
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    execute,
+    terminal::{self, ClearType},
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
+use std::io::{self, Write};
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -220,6 +226,228 @@ fn build_menu_items(providers: &[Provider]) -> Vec<String> {
             )
         })
         .collect()
+}
+
+// ── Interactive menu ─────────────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ProviderList {
+    Recent,
+    All,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ProviderMenuState {
+    list: ProviderList,
+    recent_index: usize,
+    all_index: usize,
+}
+
+struct TerminalGuard;
+
+impl TerminalGuard {
+    fn new() -> io::Result<Self> {
+        terminal::enable_raw_mode()?;
+        if let Err(err) = execute!(io::stderr(), terminal::EnterAlternateScreen, cursor::Hide) {
+            let _ = terminal::disable_raw_mode();
+            return Err(err);
+        }
+        Ok(Self)
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = execute!(io::stderr(), cursor::Show, terminal::LeaveAlternateScreen);
+        let _ = terminal::disable_raw_mode();
+    }
+}
+
+fn build_recent_provider_indices(providers: &[Provider], recent: &[String]) -> Vec<usize> {
+    let mut indices = Vec::new();
+    for id in recent {
+        if let Some(idx) = providers.iter().position(|p| p.id == *id)
+            && !indices.contains(&idx)
+        {
+            indices.push(idx);
+        }
+    }
+    indices
+}
+
+fn default_provider_menu_state(recent_indices: &[usize]) -> ProviderMenuState {
+    if recent_indices.is_empty() {
+        ProviderMenuState {
+            list: ProviderList::All,
+            recent_index: 0,
+            all_index: 0,
+        }
+    } else {
+        ProviderMenuState {
+            list: ProviderList::Recent,
+            recent_index: 0,
+            all_index: recent_indices[0],
+        }
+    }
+}
+
+fn selected_provider_index(state: &ProviderMenuState, recent_indices: &[usize]) -> usize {
+    match state.list {
+        ProviderList::Recent => recent_indices[state.recent_index],
+        ProviderList::All => state.all_index,
+    }
+}
+
+fn switch_provider_list(
+    state: &mut ProviderMenuState,
+    target: ProviderList,
+    recent_indices: &[usize],
+    provider_count: usize,
+) {
+    if target == ProviderList::Recent && recent_indices.is_empty() {
+        return;
+    }
+
+    let current_provider = selected_provider_index(state, recent_indices);
+    state.list = target;
+
+    match target {
+        ProviderList::Recent => {
+            state.recent_index = recent_indices
+                .iter()
+                .position(|idx| *idx == current_provider)
+                .unwrap_or(0);
+        }
+        ProviderList::All => {
+            state.all_index = if current_provider < provider_count {
+                current_provider
+            } else {
+                0
+            };
+        }
+    }
+}
+
+fn move_provider_menu_selection(
+    state: &mut ProviderMenuState,
+    delta: isize,
+    recent_indices: &[usize],
+    provider_count: usize,
+) {
+    let (current, len) = match state.list {
+        ProviderList::Recent => (state.recent_index, recent_indices.len()),
+        ProviderList::All => (state.all_index, provider_count),
+    };
+    if len == 0 {
+        return;
+    }
+
+    let next = (current as isize + delta).rem_euclid(len as isize) as usize;
+    match state.list {
+        ProviderList::Recent => {
+            state.recent_index = next;
+            state.all_index = recent_indices[next];
+        }
+        ProviderList::All => {
+            state.all_index = next;
+        }
+    }
+}
+
+fn render_provider_menu(
+    out: &mut impl Write,
+    providers: &[Provider],
+    menu_items: &[String],
+    recent_indices: &[usize],
+    state: &ProviderMenuState,
+) -> io::Result<()> {
+    execute!(out, cursor::MoveTo(0, 0), terminal::Clear(ClearType::All))?;
+
+    let recent_tab = if state.list == ProviderList::Recent {
+        "[Recent]"
+    } else {
+        " Recent "
+    };
+    let all_tab = if state.list == ProviderList::All {
+        "[All]"
+    } else {
+        " All "
+    };
+
+    writeln!(out, "Select provider")?;
+    writeln!(
+        out,
+        "{}  {}    ←/→ switch list, ↑/↓ move, Enter select, Esc cancel",
+        recent_tab, all_tab
+    )?;
+    writeln!(out)?;
+
+    let (exe_w, prov_w) = compute_widths(providers);
+    writeln!(
+        out,
+        "  {:<exe_w$}   {:<prov_w$}   MODEL",
+        "TOOL", "PROVIDER"
+    )?;
+
+    let active_indices: Vec<usize> = match state.list {
+        ProviderList::Recent => recent_indices.to_vec(),
+        ProviderList::All => (0..providers.len()).collect(),
+    };
+    let selected = selected_provider_index(state, recent_indices);
+
+    for idx in active_indices {
+        let marker = if idx == selected { ">" } else { " " };
+        writeln!(out, "{} {}", marker, menu_items[idx])?;
+    }
+
+    out.flush()
+}
+
+fn select_provider_interactive(
+    providers: &[Provider],
+    recent: &[String],
+) -> io::Result<Option<usize>> {
+    let recent_indices = build_recent_provider_indices(providers, recent);
+    let menu_items = build_menu_items(providers);
+    let mut state = default_provider_menu_state(&recent_indices);
+    let _guard = TerminalGuard::new()?;
+    let mut stderr = io::stderr();
+
+    loop {
+        render_provider_menu(&mut stderr, providers, &menu_items, &recent_indices, &state)?;
+
+        if let Event::Key(KeyEvent {
+            code, modifiers, ..
+        }) = event::read()?
+        {
+            match code {
+                KeyCode::Up => {
+                    move_provider_menu_selection(&mut state, -1, &recent_indices, providers.len())
+                }
+                KeyCode::Down => {
+                    move_provider_menu_selection(&mut state, 1, &recent_indices, providers.len())
+                }
+                KeyCode::Left => switch_provider_list(
+                    &mut state,
+                    ProviderList::Recent,
+                    &recent_indices,
+                    providers.len(),
+                ),
+                KeyCode::Right => switch_provider_list(
+                    &mut state,
+                    ProviderList::All,
+                    &recent_indices,
+                    providers.len(),
+                ),
+                KeyCode::Enter => {
+                    return Ok(Some(selected_provider_index(&state, &recent_indices)));
+                }
+                KeyCode::Esc => return Ok(None),
+                KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => return Ok(None),
+                _ => {}
+            }
+        }
+    }
 }
 
 // ── Secret masking ────────────────────────────────────────────────────────────
@@ -455,24 +683,9 @@ fn main() {
         }
     } else {
         let recent = read_recent();
-        let default_idx = recent
-            .first()
-            .and_then(|id| providers.iter().position(|p| p.id == *id))
-            .unwrap_or(0);
-
-        let items = build_menu_items(&providers);
-
-        let (exe_w, prov_w) = compute_widths(&providers);
-        eprintln!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER");
-
-        let selection = match Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select")
-            .items(&items)
-            .default(default_idx)
-            .interact_opt()
-        {
+        let selection = match select_provider_interactive(&providers, &recent) {
             Ok(opt) => opt,
-            Err(dialoguer::Error::IO(io_err)) => {
+            Err(io_err) => {
                 eprintln!("❌ I/O error during selection: {io_err}");
                 std::process::exit(1);
             }
@@ -746,6 +959,96 @@ executable = "claude"
         assert!(items[0].contains("claude"));
         assert!(items[0].contains("Solo"));
         assert!(items[0].contains("m"));
+    }
+
+    #[test]
+    fn recent_provider_indices_filter_missing_and_duplicates() {
+        let providers = vec![
+            make_provider("a", Executable::Claude, false, false),
+            make_provider("b", Executable::Claude, false, false),
+            make_provider("c", Executable::Claude, false, false),
+        ];
+        let recent = vec![
+            "c".to_string(),
+            "missing".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ];
+
+        let indices = build_recent_provider_indices(&providers, &recent);
+        assert_eq!(indices, vec![2, 1]);
+    }
+
+    #[test]
+    fn menu_defaults_to_recent_first_provider() {
+        let state = default_provider_menu_state(&[2, 1]);
+
+        assert_eq!(state.list, ProviderList::Recent);
+        assert_eq!(state.recent_index, 0);
+        assert_eq!(state.all_index, 2);
+        assert_eq!(selected_provider_index(&state, &[2, 1]), 2);
+    }
+
+    #[test]
+    fn menu_defaults_to_all_without_recent() {
+        let state = default_provider_menu_state(&[]);
+
+        assert_eq!(state.list, ProviderList::All);
+        assert_eq!(state.recent_index, 0);
+        assert_eq!(state.all_index, 0);
+    }
+
+    #[test]
+    fn menu_switch_preserves_current_provider_when_present() {
+        let recent_indices = vec![2, 1];
+        let mut state = default_provider_menu_state(&recent_indices);
+
+        switch_provider_list(&mut state, ProviderList::All, &recent_indices, 3);
+        assert_eq!(state.list, ProviderList::All);
+        assert_eq!(state.all_index, 2);
+
+        move_provider_menu_selection(&mut state, -1, &recent_indices, 3);
+        assert_eq!(state.all_index, 1);
+
+        switch_provider_list(&mut state, ProviderList::Recent, &recent_indices, 3);
+        assert_eq!(state.list, ProviderList::Recent);
+        assert_eq!(state.recent_index, 1);
+        assert_eq!(selected_provider_index(&state, &recent_indices), 1);
+    }
+
+    #[test]
+    fn menu_switch_to_recent_falls_back_to_first_recent_provider() {
+        let recent_indices = vec![2];
+        let mut state = ProviderMenuState {
+            list: ProviderList::All,
+            recent_index: 0,
+            all_index: 1,
+        };
+
+        switch_provider_list(&mut state, ProviderList::Recent, &recent_indices, 3);
+
+        assert_eq!(state.list, ProviderList::Recent);
+        assert_eq!(state.recent_index, 0);
+        assert_eq!(selected_provider_index(&state, &recent_indices), 2);
+    }
+
+    #[test]
+    fn menu_move_wraps_and_syncs_recent_selection_to_all_index() {
+        let recent_indices = vec![2, 1];
+        let mut state = ProviderMenuState {
+            list: ProviderList::All,
+            recent_index: 0,
+            all_index: 0,
+        };
+
+        move_provider_menu_selection(&mut state, -1, &recent_indices, 3);
+        assert_eq!(state.all_index, 2);
+
+        switch_provider_list(&mut state, ProviderList::Recent, &recent_indices, 3);
+        move_provider_menu_selection(&mut state, 1, &recent_indices, 3);
+
+        assert_eq!(state.recent_index, 1);
+        assert_eq!(state.all_index, 1);
     }
 
     // ── Shell quoting ────────────────────────────────────────────────────────
