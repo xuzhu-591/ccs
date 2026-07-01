@@ -248,7 +248,7 @@ struct TerminalGuard;
 impl TerminalGuard {
     fn new() -> io::Result<Self> {
         terminal::enable_raw_mode()?;
-        if let Err(err) = execute!(io::stderr(), terminal::EnterAlternateScreen, cursor::Hide) {
+        if let Err(err) = execute!(io::stderr(), cursor::Hide) {
             let _ = terminal::disable_raw_mode();
             return Err(err);
         }
@@ -258,7 +258,7 @@ impl TerminalGuard {
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
-        let _ = execute!(io::stderr(), cursor::Show, terminal::LeaveAlternateScreen);
+        let _ = execute!(io::stderr(), cursor::Show);
         let _ = terminal::disable_raw_mode();
     }
 }
@@ -354,53 +354,75 @@ fn move_provider_menu_selection(
     }
 }
 
+fn provider_list_label(list: ProviderList) -> &'static str {
+    match list {
+        ProviderList::Recent => "Recent",
+        ProviderList::All => "All",
+    }
+}
+
+fn truncate_to_width(s: &str, max_width: usize) -> String {
+    let len = s.chars().count();
+    if len <= max_width {
+        return s.to_string();
+    }
+    if max_width <= 3 {
+        return ".".repeat(max_width);
+    }
+
+    s.chars().take(max_width - 3).collect::<String>() + "..."
+}
+
+fn write_menu_line(out: &mut impl Write, line: &str, width: u16) -> io::Result<()> {
+    let width = width.saturating_sub(1).max(1) as usize;
+    let line = truncate_to_width(line, width);
+    write!(out, "{line}\r\n")
+}
+
 fn render_provider_menu(
     out: &mut impl Write,
     providers: &[Provider],
     menu_items: &[String],
     recent_indices: &[usize],
     state: &ProviderMenuState,
-) -> io::Result<()> {
-    execute!(out, cursor::MoveTo(0, 0), terminal::Clear(ClearType::All))?;
+    previous_line_count: u16,
+) -> io::Result<u16> {
+    if previous_line_count > 0 {
+        execute!(out, cursor::MoveUp(previous_line_count))?;
+    }
+    execute!(out, terminal::Clear(ClearType::FromCursorDown))?;
 
-    let recent_tab = if state.list == ProviderList::Recent {
-        "[Recent]"
-    } else {
-        " Recent "
-    };
-    let all_tab = if state.list == ProviderList::All {
-        "[All]"
-    } else {
-        " All "
-    };
-
-    writeln!(out, "Select provider")?;
-    writeln!(
-        out,
-        "{}  {}    ←/→ switch list, ↑/↓ move, Enter select, Esc cancel",
-        recent_tab, all_tab
-    )?;
-    writeln!(out)?;
+    let width = terminal::size().map(|(width, _)| width).unwrap_or(100);
+    let prompt = format!("? Select [{}] ›", provider_list_label(state.list));
+    write_menu_line(out, &prompt, width)?;
 
     let (exe_w, prov_w) = compute_widths(providers);
-    writeln!(
+    write_menu_line(
         out,
-        "  {:<exe_w$}   {:<prov_w$}   MODEL",
-        "TOOL", "PROVIDER"
+        &format!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER"),
+        width,
     )?;
 
     let active_indices: Vec<usize> = match state.list {
         ProviderList::Recent => recent_indices.to_vec(),
         ProviderList::All => (0..providers.len()).collect(),
     };
+    let line_count = active_indices.len().saturating_add(4) as u16;
     let selected = selected_provider_index(state, recent_indices);
 
     for idx in active_indices {
-        let marker = if idx == selected { ">" } else { " " };
-        writeln!(out, "{} {}", marker, menu_items[idx])?;
+        let marker = if idx == selected { "❯" } else { " " };
+        write_menu_line(out, &format!("{marker} {}", menu_items[idx]), width)?;
     }
 
-    out.flush()
+    write_menu_line(out, "", width)?;
+    write_menu_line(
+        out,
+        "←/→ switch list · ↑/↓ move · Enter select · Esc cancel",
+        width,
+    )?;
+
+    out.flush().map(|_| line_count)
 }
 
 fn select_provider_interactive(
@@ -412,9 +434,17 @@ fn select_provider_interactive(
     let mut state = default_provider_menu_state(&recent_indices);
     let _guard = TerminalGuard::new()?;
     let mut stderr = io::stderr();
+    let mut rendered_lines = 0;
 
     loop {
-        render_provider_menu(&mut stderr, providers, &menu_items, &recent_indices, &state)?;
+        rendered_lines = render_provider_menu(
+            &mut stderr,
+            providers,
+            &menu_items,
+            &recent_indices,
+            &state,
+            rendered_lines,
+        )?;
 
         if let Event::Key(KeyEvent {
             code, modifiers, ..
@@ -1049,6 +1079,26 @@ executable = "claude"
 
         assert_eq!(state.recent_index, 1);
         assert_eq!(state.all_index, 1);
+    }
+
+    #[test]
+    fn truncate_to_width_keeps_short_lines() {
+        assert_eq!(truncate_to_width("abc", 3), "abc");
+        assert_eq!(truncate_to_width("abc", 5), "abc");
+    }
+
+    #[test]
+    fn truncate_to_width_shortens_long_lines() {
+        assert_eq!(truncate_to_width("abcdef", 6), "abcdef");
+        assert_eq!(truncate_to_width("abcdef", 5), "ab...");
+        assert_eq!(truncate_to_width("abcdef", 2), "..");
+    }
+
+    #[test]
+    fn write_menu_line_uses_crlf_for_raw_mode() {
+        let mut out = Vec::new();
+        write_menu_line(&mut out, "abc", 80).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "abc\r\n");
     }
 
     // ── Shell quoting ────────────────────────────────────────────────────────

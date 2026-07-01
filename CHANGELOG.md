@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-07-01
+
+### Fixed
+- Keep the interactive provider menu in the current terminal scrollback instead of clearing the screen.
+- Restore raw-mode line alignment and tighten the menu layout.
+
 ## [0.2.8] - 2026-07-01
 
 ### Added
@@ -82,7 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/xuzhu-591/ccs/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/xuzhu-591/ccs/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/xuzhu-591/ccs/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/xuzhu-591/ccs/compare/v0.2.5...v0.2.6
