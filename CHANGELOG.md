@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-07-02
+
+### Added
+- Add color highlighting to the interactive provider menu, with `NO_COLOR` support.
+
 ## [0.2.9] - 2026-07-01
 
 ### Fixed
@@ -88,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.10...HEAD
+[0.2.10]: https://github.com/xuzhu-591/ccs/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/xuzhu-591/ccs/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/xuzhu-591/ccs/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/xuzhu-591/ccs/compare/v0.2.6...v0.2.7

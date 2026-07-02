@@ -3,6 +3,7 @@ use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
+    style::{Attribute, Color, Stylize, style},
     terminal::{self, ClearType},
 };
 use serde::Deserialize;
@@ -212,6 +213,7 @@ fn compute_widths(providers: &[Provider]) -> (usize, usize) {
     (exe_w, prov_w)
 }
 
+#[cfg(test)]
 fn build_menu_items(providers: &[Provider]) -> Vec<String> {
     let (exe_w, prov_w) = compute_widths(providers);
 
@@ -379,10 +381,67 @@ fn write_menu_line(out: &mut impl Write, line: &str, width: u16) -> io::Result<(
     write!(out, "{line}\r\n")
 }
 
+#[derive(Clone, Copy)]
+struct MenuStyle {
+    color: Color,
+    bold: bool,
+}
+
+impl MenuStyle {
+    const fn new(color: Color, bold: bool) -> Self {
+        Self { color, bold }
+    }
+}
+
+const STYLE_DEFAULT: MenuStyle = MenuStyle::new(Color::White, false);
+const STYLE_DEFAULT_BOLD: MenuStyle = MenuStyle::new(Color::White, true);
+const STYLE_DIM: MenuStyle = MenuStyle::new(Color::DarkGrey, false);
+const STYLE_DIM_BOLD: MenuStyle = MenuStyle::new(Color::DarkGrey, true);
+const STYLE_CYAN: MenuStyle = MenuStyle::new(Color::Cyan, false);
+const STYLE_CYAN_BOLD: MenuStyle = MenuStyle::new(Color::Cyan, true);
+const STYLE_GREEN_BOLD: MenuStyle = MenuStyle::new(Color::Green, true);
+const STYLE_YELLOW: MenuStyle = MenuStyle::new(Color::Yellow, false);
+const STYLE_YELLOW_BOLD: MenuStyle = MenuStyle::new(Color::Yellow, true);
+const STYLE_PROVIDER_BOLD: MenuStyle = MenuStyle::new(Color::Blue, true);
+const STYLE_MODEL_BOLD: MenuStyle = MenuStyle::new(Color::Magenta, true);
+
+fn menu_colors_enabled() -> bool {
+    std::env::var_os("NO_COLOR").is_none()
+}
+
+fn write_styled_menu_line(
+    out: &mut impl Write,
+    segments: &[(&str, MenuStyle)],
+    width: u16,
+    colors_enabled: bool,
+) -> io::Result<()> {
+    let mut remaining = width.saturating_sub(1).max(1) as usize;
+
+    for (text, menu_style) in segments {
+        if remaining == 0 {
+            break;
+        }
+
+        let visible_text = truncate_to_width(text, remaining);
+        remaining = remaining.saturating_sub(visible_text.chars().count());
+
+        if colors_enabled {
+            let mut styled = style(visible_text).with(menu_style.color);
+            if menu_style.bold {
+                styled = styled.attribute(Attribute::Bold);
+            }
+            write!(out, "{styled}")?;
+        } else {
+            write!(out, "{visible_text}")?;
+        }
+    }
+
+    write!(out, "\r\n")
+}
+
 fn render_provider_menu(
     out: &mut impl Write,
     providers: &[Provider],
-    menu_items: &[String],
     recent_indices: &[usize],
     state: &ProviderMenuState,
     previous_line_count: u16,
@@ -393,15 +452,24 @@ fn render_provider_menu(
     execute!(out, terminal::Clear(ClearType::FromCursorDown))?;
 
     let width = terminal::size().map(|(width, _)| width).unwrap_or(100);
-    let prompt = format!("? Select [{}] ›", provider_list_label(state.list));
-    write_menu_line(out, &prompt, width)?;
+    let colors_enabled = menu_colors_enabled();
+    let list_label = format!("[{}]", provider_list_label(state.list));
+    write_styled_menu_line(
+        out,
+        &[
+            ("?", STYLE_CYAN_BOLD),
+            (" Select ", STYLE_DEFAULT),
+            (&list_label, STYLE_YELLOW_BOLD),
+            (" ", STYLE_DEFAULT),
+            ("›", STYLE_GREEN_BOLD),
+        ],
+        width,
+        colors_enabled,
+    )?;
 
     let (exe_w, prov_w) = compute_widths(providers);
-    write_menu_line(
-        out,
-        &format!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER"),
-        width,
-    )?;
+    let header = format!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER");
+    write_styled_menu_line(out, &[(&header, STYLE_DIM_BOLD)], width, colors_enabled)?;
 
     let active_indices: Vec<usize> = match state.list {
         ProviderList::Recent => recent_indices.to_vec(),
@@ -411,15 +479,57 @@ fn render_provider_menu(
     let selected = selected_provider_index(state, recent_indices);
 
     for idx in active_indices {
-        let marker = if idx == selected { "❯" } else { " " };
-        write_menu_line(out, &format!("{marker} {}", menu_items[idx]), width)?;
+        let provider = &providers[idx];
+        let is_selected = idx == selected;
+        let marker = if is_selected { "❯ " } else { "  " };
+        let exe = format!("{:<exe_w$}", provider.executable.as_str());
+        let provider_name = format!("{:<prov_w$}", provider.provider);
+        let row_style = if is_selected {
+            STYLE_DEFAULT_BOLD
+        } else {
+            STYLE_DIM
+        };
+        let provider_style = if is_selected {
+            STYLE_PROVIDER_BOLD
+        } else {
+            STYLE_DIM
+        };
+        let model_style = if is_selected {
+            STYLE_MODEL_BOLD
+        } else {
+            STYLE_DIM
+        };
+
+        write_styled_menu_line(
+            out,
+            &[
+                (marker, STYLE_GREEN_BOLD),
+                (&exe, row_style),
+                ("   ", STYLE_DEFAULT),
+                (&provider_name, provider_style),
+                ("   ", STYLE_DEFAULT),
+                (&provider.model, model_style),
+            ],
+            width,
+            colors_enabled,
+        )?;
     }
 
     write_menu_line(out, "", width)?;
-    write_menu_line(
+    write_styled_menu_line(
         out,
-        "←/→ switch list · ↑/↓ move · Enter select · Esc cancel",
+        &[
+            ("←/→", STYLE_CYAN),
+            (" switch list · ", STYLE_DIM),
+            ("↑/↓", STYLE_CYAN),
+            (" move · ", STYLE_DIM),
+            ("Enter", STYLE_YELLOW),
+            (" select · ", STYLE_DIM),
+            ("Esc", STYLE_YELLOW),
+            (" cancel", STYLE_DIM),
+        ],
         width,
+        colors_enabled,
     )?;
 
     out.flush().map(|_| line_count)
@@ -430,7 +540,6 @@ fn select_provider_interactive(
     recent: &[String],
 ) -> io::Result<Option<usize>> {
     let recent_indices = build_recent_provider_indices(providers, recent);
-    let menu_items = build_menu_items(providers);
     let mut state = default_provider_menu_state(&recent_indices);
     let _guard = TerminalGuard::new()?;
     let mut stderr = io::stderr();
@@ -440,7 +549,6 @@ fn select_provider_interactive(
         rendered_lines = render_provider_menu(
             &mut stderr,
             providers,
-            &menu_items,
             &recent_indices,
             &state,
             rendered_lines,
@@ -1099,6 +1207,19 @@ executable = "claude"
         let mut out = Vec::new();
         write_menu_line(&mut out, "abc", 80).unwrap();
         assert_eq!(String::from_utf8(out).unwrap(), "abc\r\n");
+    }
+
+    #[test]
+    fn write_styled_menu_line_plain_when_colors_disabled() {
+        let mut out = Vec::new();
+        write_styled_menu_line(
+            &mut out,
+            &[("abc", STYLE_CYAN_BOLD), ("def", STYLE_GREEN_BOLD)],
+            80,
+            false,
+        )
+        .unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "abcdef\r\n");
     }
 
     // ── Shell quoting ────────────────────────────────────────────────────────
