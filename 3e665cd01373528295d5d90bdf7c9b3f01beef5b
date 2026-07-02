@@ -1,0 +1,44 @@
+src/main.rs
+  64b977151e560170 6,216,384-441,455-457,459-465,467,471-472,482-515,519,521-530,532,1212-1224
+CHANGELOG.md
+  64b977151e560170 10-14,96-97
+Cargo.toml
+  64b977151e560170 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "3e665cd01373528295d5d90bdf7c9b3f01beef5b",
+  "prompts": {
+    "64b977151e560170": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f1cf8-d0a4-78f1-b3dd-1c581cb396f7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "xuzhu-591",
+      "messages": [],
+      "total_additions": 147,
+      "total_deletions": 20,
+      "accepted_lines": 143,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "src/main.rs": {
+          "additions": 139,
+          "deletions": 18,
+          "accepted_lines": 135
+        },
+        "CHANGELOG.md": {
+          "additions": 7,
+          "deletions": 1,
+          "accepted_lines": 7
+        },
+        "Cargo.toml": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        }
+      }
+    }
+  }
+}
