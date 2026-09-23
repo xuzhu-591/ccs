@@ -83,3 +83,4 @@ codex     FAIL — codex not found in effective PATH
 - 集成测试覆盖默认四列、环境变量全部遮盖、显式展示、未知配置项、重复 ID、实际 PATH 覆盖、无 `which`、执行权限、相对路径、符号链接、旧命令迁移提示、启动参数透传和 recent。
 - 独立 PTY 走查覆盖 100 列与 36 列布局、中文显示宽度、颜色与 `NO_COLOR`、菜单键盘选择、resume、Recent 默认选择及 Esc 取消。
 - GitHub CI 的 macOS job 增加集成测试执行，与 Linux job 一起验证 Unix 平台差异。发布版本为 `0.3.0`，体现 CLI 契约变化。
+- CI 审计工具固定为 `cargo-audit 0.22.2 --locked`。首次 CI 失败发生在未锁定依赖安装阶段：`kstring 2.0.5` 要求 Rust 1.96，发布锁文件中的 2.0.2 与项目 1.95 工具链兼容。
