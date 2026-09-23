@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-23
+
+### Changed
+- Use `[[profiles]]` and `[profiles.env]` in generated configuration, documentation, and configuration diagnostics.
+- Continue reading legacy `[[providers]]` / `[providers.env]` configurations. Reject files mixing both naming schemes. The service-name field remains `provider`.
+- Upgrade ccs before migrating table headers; versions through 0.3.1 require the legacy keys.
+
 ## [0.3.1] - 2026-09-23
 
 ### Changed
@@ -111,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/xuzhu-591/ccs/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/xuzhu-591/ccs/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/xuzhu-591/ccs/compare/v0.2.10...v0.3.0
 [0.2.10]: https://github.com/xuzhu-591/ccs/compare/v0.2.9...v0.2.10

@@ -77,7 +77,7 @@ Edit it to add your API keys and desired profiles.
 ```toml
 # ~/.config/ccs/config.toml
 
-[[providers]]
+[[profiles]]
 id              = "deepseek-pro"
 provider        = "DeepSeek"
 model           = "deepseek-v4-pro"
@@ -85,7 +85,7 @@ executable      = "claude"
 supports_resume = true
 base_args       = ["--dangerously-skip-permissions"]
 
-[providers.env]
+[profiles.env]
 ANTHROPIC_BASE_URL             = "https://api.deepseek.com/anthropic"
 ANTHROPIC_AUTH_TOKEN           = "YOUR_DEEPSEEK_API_KEY"
 ANTHROPIC_MODEL                = "deepseek-v4-pro"
@@ -96,7 +96,7 @@ CLAUDE_CODE_SUBAGENT_MODEL     = "deepseek-v4-pro"
 CLAUDE_CODE_EFFORT_LEVEL       = "max"
 ```
 
-Each `[[providers]]` block defines one **profile**: a provider, model, agent CLI, and launch settings. The existing TOML keys are retained. Profile IDs must be unique; `id`, `provider`, and `model` must not be blank.
+Each `[[profiles]]` block defines one **profile**: a provider, model, agent CLI, and launch settings. Legacy `[[providers]]` / `[providers.env]` keys remain supported. Use one naming scheme per file; mixing both is rejected. Profile IDs must be unique; `id`, `provider`, and `model` must not be blank.
 
 ### Config fields
 
@@ -109,7 +109,7 @@ Each `[[providers]]` block defines one **profile**: a provider, model, agent CLI
 | `supports_resume` | bool | — | Enable `-r` / resume (default: `false`) |
 | `resume_as_subcommand` | bool | — | Use `codex resume` style instead of `-r` flag (default: `false`) |
 | `base_args` | string[] | — | Args always prepended to the command |
-| `[providers.env]` | table | — | Environment variables injected into the subprocess |
+| `[profiles.env]` | table | — | Environment variables injected into the subprocess |
 
 ### Resume behaviour
 
@@ -206,12 +206,16 @@ The list preserves configuration order, aligns Unicode text, and uses a stacked 
 
 `ccs list` does not display environment variables. `ccs list --verbose` and `--dry-run` mask **every environment value** as `***masked***`. Add `--show-secrets` to display original values. Other profile fields and command arguments are displayed as configured.
 
+### Configuration keys in 0.3.2
+
+Use `[[profiles]]` for each launch profile and `[profiles.env]` for its environment. The `provider` field still names the service. To migrate an existing file, update both table headers together, including commented examples; leave field values and IDs unchanged. Upgrade ccs before migrating: versions through 0.3.1 require the old headers. To roll back, restore the old headers or your configuration backup.
+
 ### Upgrading from 0.2.x
 
 - Replace `ccs validate` with `ccs list --verbose`.
 - Replace `--provider <ID>` with `--profile <PROFILE_ID>`. The short option `-p` is unchanged.
-- Existing `[[providers]]` configuration and recent profile IDs are retained. Correct duplicate IDs or blank `id`, `provider`, and `model` fields before use.
-- Unknown top-level or profile fields fail verbose checks. Custom keys inside `[providers.env]` remain supported.
+- Existing `[[providers]]` / `[providers.env]` configuration remains readable. New configurations use `[[profiles]]` / `[profiles.env]`; recent profile IDs are unchanged. Correct duplicate IDs or blank `id`, `provider`, and `model` fields before use.
+- Unknown top-level or profile fields fail verbose checks. Custom keys inside `[profiles.env]` remain supported.
 
 ### Dry-run output example
 
@@ -226,10 +230,10 @@ The list preserves configuration order, aligns Unicode text, and uses a stacked 
 
 ## Adding a custom profile
 
-Add a new `[[providers]]` block to `~/.config/ccs/config.toml`:
+Add a new `[[profiles]]` block to `~/.config/ccs/config.toml`:
 
 ```toml
-[[providers]]
+[[profiles]]
 id              = "my-profile"
 provider        = "MyService"
 model           = "my-model-v1"
@@ -237,7 +241,7 @@ executable      = "claude"
 supports_resume = true
 base_args       = ["--dangerously-skip-permissions"]
 
-[providers.env]
+[profiles.env]
 ANTHROPIC_BASE_URL   = "https://api.myservice.com/v1"
 ANTHROPIC_AUTH_TOKEN = "sk-..."
 ```

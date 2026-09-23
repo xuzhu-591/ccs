@@ -1,7 +1,7 @@
 # ~/.config/ccs/config.toml
 #
 # ccs profile configuration.
-# Each [[providers]] block defines one selectable profile.
+# Each [[profiles]] block defines one selectable profile.
 #
 # Fields:
 #   id                   - Unique identifier; used with the -p / --profile flag
@@ -12,13 +12,13 @@
 #   resume_as_subcommand - If true, resume is passed as a subcommand *before* base_args
 #                          (e.g. `codex resume …`); if false, `-r` is appended after base_args
 #   base_args            - Fixed arguments always passed to the executable
-#   [providers.env]      - Environment variables injected into the subprocess
+#   [profiles.env]      - Environment variables injected into the subprocess
 
 # ── Example: DeepSeek ─────────────────────────────────────────────────────────
 #
 # Sign up at https://platform.deepseek.com to get your API key.
 
-[[providers]]
+[[profiles]]
 id              = "deepseek"
 provider        = "DeepSeek"
 model           = "deepseek-v4-pro"
@@ -26,7 +26,7 @@ executable      = "claude"
 supports_resume = true
 base_args       = ["--dangerously-skip-permissions"]
 
-[providers.env]
+[profiles.env]
 ANTHROPIC_BASE_URL             = "https://api.deepseek.com/anthropic"
 ANTHROPIC_AUTH_TOKEN           = "YOUR_DEEPSEEK_API_KEY"
 ANTHROPIC_MODEL                = "deepseek-v4-pro"
@@ -40,7 +40,7 @@ CLAUDE_CODE_EFFORT_LEVEL       = "max"
 #
 # Requires the `codex` CLI: https://github.com/openai/codex
 
-[[providers]]
+[[profiles]]
 id                   = "codex"
 provider             = "OpenAI"
 model                = "gpt-4o"
@@ -49,5 +49,5 @@ supports_resume      = true
 resume_as_subcommand = true
 base_args            = ["--dangerously-bypass-approvals-and-sandbox"]
 
-[providers.env]
+[profiles.env]
 OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"

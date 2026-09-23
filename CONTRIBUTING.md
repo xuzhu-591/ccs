@@ -27,7 +27,7 @@ Most contributions can be done purely in config. Add your profile example to
 `src/default_profiles.toml` with placeholder keys:
 
 ```toml
-[[providers]]
+[[profiles]]
 id              = "my-profile"
 provider        = "MyService"
 model           = "my-model-v1"
@@ -35,12 +35,12 @@ executable      = "claude"
 supports_resume = true
 base_args       = ["--dangerously-skip-permissions"]
 
-[providers.env]
+[profiles.env]
 ANTHROPIC_BASE_URL   = "https://api.myservice.com/anthropic"
 ANTHROPIC_AUTH_TOKEN = "YOUR_MYSERVICE_API_KEY"
 ```
 
-Each block defines a profile. The `providers` / `providers.env` TOML keys are retained for configuration compatibility; `provider` names the service.
+Each block defines a profile. Use `[[profiles]]` / `[profiles.env]`; the legacy `[[providers]]` / `[providers.env]` keys remain readable for compatibility; `provider` names the service.
 
 Use `YOUR_*` placeholders — **never commit real API keys**.
 
