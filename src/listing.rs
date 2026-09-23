@@ -159,7 +159,7 @@ pub(super) fn write_list(
     terminal_width: Option<usize>,
     colors: bool,
 ) -> io::Result<bool> {
-    write_table(out, &config.providers, terminal_width, colors)?;
+    write_table(out, &config.profiles, terminal_width, colors)?;
     if !verbose {
         return Ok(true);
     }
@@ -176,7 +176,7 @@ pub(super) fn write_list(
         )?;
     }
     let mut passed = 0;
-    for (index, profile) in config.providers.iter().enumerate() {
+    for (index, profile) in config.profiles.iter().enumerate() {
         let executable = find_executable(profile);
         let mut fields: Vec<_> = profile.unknown.keys().collect();
         fields.sort();
@@ -241,7 +241,7 @@ pub(super) fn write_list(
     writeln!(
         out,
         "\nLocal checks: {passed} passed, {} failed{}.",
-        config.providers.len() - passed,
+        config.profiles.len() - passed,
         if config_valid {
             ""
         } else {
@@ -249,7 +249,7 @@ pub(super) fn write_list(
         }
     )?;
     writeln!(out, "Credentials and service connectivity are not checked.")?;
-    Ok(config_valid && passed == config.providers.len())
+    Ok(config_valid && passed == config.profiles.len())
 }
 
 #[cfg(test)]

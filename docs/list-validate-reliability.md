@@ -47,7 +47,7 @@ codex     FAIL — codex not found in effective PATH
 
 ### 本地检查规则
 
-1. 共用的配置加载路径检查 provider 数组非空、`id`/`provider`/`model` 去除首尾空白后非空，以及 `id` 全局唯一。保留原始值，不自动修剪或重命名。重复 ID 会让 `-p ID` 选中首项，也会混淆 recent，因此所有入口一致拒绝。
+1. 共用的配置加载路径检查 Profile 数组非空、`id`/`provider`/`model` 去除首尾空白后非空，以及 `id` 全局唯一。保留原始值，不自动修剪或重命名。重复 ID 会让 `-p ID` 选中首项，也会混淆 recent，因此所有入口一致拒绝。
 2. 详细模式额外检查顶层与 `[[providers]]` 的未知字段，报出所在项和字段名；`[providers.env]` 的任意变量名合法。普通启动和默认 `list` 暂不因未知字段失败，以兼容已有配置。必填字段缺失及类型错误继续由 TOML/Serde 解析报错。
 3. 详细模式按每项实际生效的 `PATH` 顺序定位 `claude`/`codex`，包含 `providers.env.PATH` 的覆盖；不再调用外部 `which`。确认目标是可执行文件且有执行权限，允许有效符号链接；不运行 agent 程序。实现与测试覆盖空目录项、相对目录及未设置 `PATH` 的 Unix 行为。
 4. 首次没有配置文件时沿用现有的模板创建流程，并在输出中明确提示模板尚需填写；详细模式的成功仍只代表本地结构与可执行文件检查，不代表占位符凭据可用。
@@ -58,7 +58,7 @@ codex     FAIL — codex not found in effective PATH
 |---|---|---|
 | CLI 命令 | 移除公开的 `validate`；`list` 默认仅四列，`list --verbose` 输出本地检查及环境变量；将长参数 `--provider` 改为 `--profile`，短参数 `-p` 不变。 | 使用 `ccs validate` 的脚本改为 `ccs list --verbose`，以退出码判断本地检查。`-p` 保持可用；使用 `--provider` 的调用方改为 `--profile`。 |
 | 展示与保密 | 详细列表和 `dry-run` 默认遮盖所有环境变量值；`--show-secrets` 才输出原值。 | 原先默认可见的非关键词变量值会被遮盖；确需原值的调用方显式加参数。表格列和行布局变化，依赖固定文本列的脚本需调整。 |
-| 配置语义 | 空关键字段或重复 ID 从可解析变为错误；未知顶层/provider 字段在详细模式报错，env 键保持开放。 | 异常存量配置需手工更正。合法 `[[providers]]` 配置、短参数 `-p`、agent 启动参数和 recent 文件不迁移。 |
+| 配置语义 | 空关键字段或重复 ID 从可解析变为错误；未知顶层/Profile 字段在详细模式报错，env 键保持开放。 | 异常存量配置需手工更正。合法 `[[providers]]` 配置、短参数 `-p`、agent 启动参数和 recent 文件不迁移。 |
 | 检查语义 | 从外部 `which` 与父进程 `PATH` 改为有效 `PATH` 的文件检查。 | 检查结果与退出码可能变化，尤其是自定义 `PATH` 或缺少 `which` 的环境。首次创建的模板仍需填写，检查成功不表示线上服务可用。 |
 | 命名 | 界面和文档用 Profile 表示整条运行配置，`provider` 保留为服务商字段。 | 配置文件名、TOML 键名与现有 `-p` 保持兼容；`--provider` 需要迁移为 `--profile`，无配置自动改写。 |
 
@@ -66,8 +66,8 @@ codex     FAIL — codex not found in effective PATH
 
 ## 上线步骤
 
-1. 发布前检查存量配置中的重复 ID、空字段和未知顶层/provider 字段；记录需要人工修正的项，不自动改写用户文件。更新 CLI 帮助、README 和 CHANGELOG，明确 `validate` 到 `list --verbose`、`--provider` 到 `--profile` 的迁移及成功语义。
-2. 固定 Case 验收：四列表的顺序、中文/英文显示宽度、窄终端及重定向输出；详细模式环境变量全部遮盖与显式展示；每项检查结果及汇总退出码；首次缺配置生成模板及提示、坏 TOML、重复 ID、未知字段；无 `which` 但 agent CLI 存在；provider 覆盖 `PATH` 的成功与失败场景。
+1. 发布前检查存量配置中的重复 ID、空字段和未知顶层/Profile 字段；记录需要人工修正的项，不自动改写用户文件。更新 CLI 帮助、README 和 CHANGELOG，明确 `validate` 到 `list --verbose`、`--provider` 到 `--profile` 的迁移及成功语义。
+2. 固定 Case 验收：四列表的顺序、中文/英文显示宽度、窄终端及重定向输出；详细模式环境变量全部遮盖与显式展示；每项检查结果及汇总退出码；首次缺配置生成模板及提示、坏 TOML、重复 ID、未知字段；无 `which` 但 agent CLI 存在；Profile 覆盖 `PATH` 的成功与失败场景。
 3. 独立验证旧功能：有效旧配置下的直接 `-p` 与新 `--profile` 启动，确认旧 `--provider` 按新契约拒绝；另验证交互菜单、resume、参数透传、recent 与 `dry-run`；运行 `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`、`cargo build`，并验证 macOS 与 Linux 的 PATH 查找。
 4. 发布单个 CLI 二进制。无数据库迁移、重算或自动任务恢复。验收旧配置与新二进制共存、旧二进制回滚读取同一配置；发布后关注 `list --verbose` 失败原因及用户反馈。
 5. 回滚替换旧版二进制即可，配置与 recent 数据兼容。回滚后 `validate` 命令恢复，旧版默认输出仍可能显示未被关键词命中的环境变量值，PATH 检查也恢复旧行为。
