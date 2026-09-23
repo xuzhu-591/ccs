@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-const CONFIG: &str = r#"[[providers]]
+const CONFIG: &str = r#"[[profiles]]
 id = "demo"
 provider = "Example"
 model = "example-model"
@@ -82,7 +82,7 @@ fn stderr(output: &Output) -> String {
 fn list_is_a_four_column_inventory_without_agent_or_environment_checks() {
     let f = Fixture::new();
     f.config(&format!(
-        "{CONFIG}\n[providers.env]\nAPI_CREDENTIAL=\"private-marker\"\n"
+        "{CONFIG}\n[profiles.env]\nAPI_CREDENTIAL=\"private-marker\"\n"
     ));
     let output = f.run(&["list"]);
     assert!(output.status.success());
@@ -108,7 +108,7 @@ fn verbose_checks_without_which_masks_every_value_and_reveals_only_on_request() 
     let f = Fixture::new();
     f.agent("codex");
     f.config(&format!(
-        "{CONFIG}\n[providers.env]\nAPI_CREDENTIAL=\"private-marker\"\nREGION=\"hidden-region\"\n"
+        "{CONFIG}\n[profiles.env]\nAPI_CREDENTIAL=\"private-marker\"\nREGION=\"hidden-region\"\n"
     ));
     let output = f.run(&["list", "--verbose"]);
     assert!(output.status.success(), "{}", stdout(&output));
@@ -136,7 +136,7 @@ fn effective_path_checks_agree_with_launch_in_both_directions() {
     let f = Fixture::new();
     f.agent("codex");
     f.config(&format!(
-        "{CONFIG}\n[providers.env]\nPATH=\"{}\"\n",
+        "{CONFIG}\n[profiles.env]\nPATH=\"{}\"\n",
         f.root.join("missing").display()
     ));
     let output = f.run(&["list", "--verbose"]);
@@ -145,7 +145,7 @@ fn effective_path_checks_agree_with_launch_in_both_directions() {
     assert_eq!(f.run(&["-p", "demo"]).status.code(), Some(1));
 
     f.config(&format!(
-        "{CONFIG}\n[providers.env]\nPATH=\"{}\"\n",
+        "{CONFIG}\n[profiles.env]\nPATH=\"{}\"\n",
         f.bin.display()
     ));
     for args in [vec!["list", "--verbose"], vec!["--profile", "demo"]] {
@@ -168,7 +168,7 @@ fn path_search_handles_empty_relative_components_permissions_and_symlinks() {
     let f = Fixture::new();
     f.agent("codex");
     for path in ["", ".", "../bin", "missing:"] {
-        f.config(&format!("{CONFIG}\n[providers.env]\nPATH=\"{path}\"\n"));
+        f.config(&format!("{CONFIG}\n[profiles.env]\nPATH=\"{path}\"\n"));
         assert!(f.run(&["list", "--verbose"]).status.success());
         assert!(f.run(&["-p", "demo"]).status.success());
     }
@@ -199,7 +199,7 @@ fn absent_path_reports_missing_cli_without_panicking() {
 fn structural_errors_fail_all_loading_entry_points() {
     let f = Fixture::new();
     for (config, reason) in [
-        ("providers=[]".to_string(), "No profiles"),
+        ("profiles=[]".to_string(), "No profiles"),
         (format!("{CONFIG}\n{CONFIG}"), "Duplicate profile ID"),
         (
             CONFIG.replace("id = \"demo\"", "id = \"  \""),
@@ -228,7 +228,7 @@ fn verbose_reports_unknown_fields_but_allows_custom_environment_keys() {
     let f = Fixture::new();
     f.agent("codex");
     f.config(&format!(
-        "typo=true\n{CONFIG}\nsuports_resume=true\n[providers.env]\nCUSTOM_SETTING=\"value\"\n"
+        "typo=true\n{CONFIG}\nsuports_resume=true\n[profiles.env]\nCUSTOM_SETTING=\"value\"\n"
     ));
     assert!(f.run(&["list"]).status.success());
     assert!(f.run(&["-p", "demo", "-n"]).status.success());
@@ -236,8 +236,8 @@ fn verbose_reports_unknown_fields_but_allows_custom_environment_keys() {
     assert_eq!(output.status.code(), Some(1));
     let text = stdout(&output);
     assert!(text.contains("Unknown config field: typo"));
-    assert!(text.contains("providers[0].suports_resume"));
-    assert!(!text.contains("Unknown field: providers[0].CUSTOM_SETTING"));
+    assert!(text.contains("profiles[0].suports_resume"));
+    assert!(!text.contains("Unknown field: profiles[0].CUSTOM_SETTING"));
 }
 
 #[test]
@@ -245,7 +245,7 @@ fn launch_preserves_arguments_environment_recent_and_resume() {
     let f = Fixture::new();
     f.agent("codex");
     f.config(&format!(
-        "{CONFIG}\n[providers.env]\nDEMO_VALUE=\"injected\"\n"
+        "{CONFIG}\n[profiles.env]\nDEMO_VALUE=\"injected\"\n"
     ));
     for selection in ["-p", "--profile"] {
         let output = f.run(&[
@@ -299,5 +299,76 @@ fn first_run_creates_and_identifies_example_configuration() {
     assert!(output.status.success());
     assert!(stderr(&output).contains("Example config created"));
     assert!(f.root.join("ccs/config.toml").exists());
+    let generated = fs::read_to_string(f.root.join("ccs/config.toml")).unwrap();
+    assert!(generated.contains("[[profiles]]"));
+    assert!(generated.contains("[profiles.env]"));
+    assert!(!generated.contains("[[providers]]"));
+    assert!(!generated.contains("[providers.env]"));
     assert!(!stdout(&output).contains("YOUR_"));
+}
+
+#[test]
+fn legacy_config_matches_profiles_for_listing_launch_and_validation() {
+    let f = Fixture::new();
+    f.agent("codex");
+    let canonical = format!("{CONFIG}\n[profiles.env]\nDEMO_VALUE=\"injected\"\n");
+    let legacy = canonical
+        .replace("[[profiles]]", "[[providers]]")
+        .replace("[profiles.env]", "[providers.env]");
+    for args in [
+        vec!["list"],
+        vec!["list", "--verbose"],
+        vec!["--profile", "demo", "-r", "--", "two words"],
+        vec!["-p", "demo", "-n"],
+    ] {
+        f.config(&canonical);
+        let expected = f.run(&args);
+        assert!(expected.status.success());
+        f.config(&legacy);
+        let actual = f.run(&args);
+        assert_eq!(actual.status.code(), expected.status.code());
+        assert_eq!(stdout(&actual), stdout(&expected));
+        assert_eq!(stderr(&actual), stderr(&expected));
+        assert_eq!(
+            fs::read_to_string(f.root.join("ccs/config.toml")).unwrap(),
+            legacy
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(f.root.join("ccs/recent")).unwrap(),
+        "demo\n"
+    );
+
+    for config in [&canonical, &legacy] {
+        f.config(&config.replace("example-model", ""));
+        let output = f.run(&["list"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(stderr(&output).contains("profiles[0].model must not be blank"));
+        f.config(&config.replace("supports_resume", "suports_resume"));
+        let output = f.run(&["list", "--verbose"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(stdout(&output).contains("profiles[0].suports_resume"));
+    }
+}
+
+#[test]
+fn mixed_config_keys_fail_before_launch_without_writing_recent() {
+    let f = Fixture::new();
+    f.agent("codex");
+    let legacy = CONFIG.replace("[[profiles]]", "[[providers]]");
+    for config in [
+        format!("{CONFIG}\n{legacy}"),
+        format!("{legacy}\n{CONFIG}"),
+        format!("{CONFIG}\n[providers.env]\nDEMO_VALUE=\"wrong-table\"\n"),
+        format!("{legacy}\n[profiles.env]\nDEMO_VALUE=\"wrong-table\"\n"),
+    ] {
+        f.config(&config);
+        for args in [vec!["list"], vec!["list", "--verbose"], vec!["-p", "demo"]] {
+            let output = f.run(&args);
+            assert_eq!(output.status.code(), Some(1));
+            assert!(stderr(&output).contains("Failed to parse config"));
+            assert!(!stdout(&output).contains("ARG:"));
+        }
+        assert!(!f.root.join("ccs/recent").exists());
+    }
 }

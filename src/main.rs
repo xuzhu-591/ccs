@@ -109,7 +109,7 @@ struct Profile {
 
 #[derive(Deserialize, Debug)]
 struct Config {
-    #[serde(rename = "providers")]
+    #[serde(alias = "providers")]
     profiles: Vec<Profile>,
     #[serde(flatten)]
     unknown: HashMap<String, toml::Value>,
@@ -179,7 +179,7 @@ fn validate_profiles(profiles: &[Profile]) -> Result<(), String> {
             ("model", &profile.model),
         ] {
             if value.trim().is_empty() {
-                return Err(format!("providers[{index}].{field} must not be blank"));
+                return Err(format!("profiles[{index}].{field} must not be blank"));
             }
         }
         if !ids.insert(&profile.id) {
@@ -883,7 +883,7 @@ mod tests {
     #[test]
     fn parse_minimal_config() {
         let toml = r#"
-[[providers]]
+[[profiles]]
 id = "test"
 provider = "Test"
 model = "m1"
@@ -901,7 +901,7 @@ executable = "claude"
     #[test]
     fn parse_full_config() {
         let toml = r#"
-[[providers]]
+[[profiles]]
 id = "ds"
 provider = "DeepSeek"
 model = "deepseek-v4-pro"
@@ -909,7 +909,7 @@ executable = "claude"
 supports_resume = true
 base_args = ["--dangerously-skip-permissions"]
 
-[providers.env]
+[profiles.env]
 ANTHROPIC_BASE_URL = "https://api.deepseek.com/anthropic"
 ANTHROPIC_AUTH_TOKEN = "YOUR_KEY"
 "#;
@@ -928,13 +928,13 @@ ANTHROPIC_AUTH_TOKEN = "YOUR_KEY"
     #[test]
     fn parse_multiple_profiles() {
         let toml = r#"
-[[providers]]
+[[profiles]]
 id = "a"
 provider = "A"
 model = "m1"
 executable = "claude"
 
-[[providers]]
+[[profiles]]
 id = "b"
 provider = "B"
 model = "m2"
@@ -951,7 +951,7 @@ resume_as_subcommand = true
     #[test]
     fn parse_invalid_executable() {
         let toml = r#"
-[[providers]]
+[[profiles]]
 id = "x"
 provider = "X"
 model = "m"
@@ -963,7 +963,7 @@ executable = "unknown"
     #[test]
     fn parse_missing_required_field() {
         let toml = r#"
-[[providers]]
+[[profiles]]
 id = "x"
 provider = "X"
 executable = "claude"
@@ -973,7 +973,7 @@ executable = "claude"
 
     #[test]
     fn parse_empty_profiles() {
-        let toml = "providers = []\n";
+        let toml = "profiles = []\n";
         let config = parse_config(toml).unwrap();
         assert!(config.profiles.is_empty());
     }

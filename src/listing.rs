@@ -207,7 +207,7 @@ pub(super) fn write_list(
         for field in fields {
             writeln!(
                 out,
-                "  Check  Unknown field: providers[{index}].{}",
+                "  Check  Unknown field: profiles[{index}].{}",
                 display_text(field)
             )?;
         }
@@ -259,14 +259,14 @@ mod tests {
     fn config() -> Config {
         super::super::parse_config(
             r#"
-[[providers]]
+[[profiles]]
 id = "cn"
 provider = "网易"
 model = "模型一"
 executable = "claude"
-[providers.env]
+[profiles.env]
 API_CREDENTIAL = "test-sensitive-value"
-[[providers]]
+[[profiles]]
 id = "en"
 provider = "OpenAI"
 model = "m"
