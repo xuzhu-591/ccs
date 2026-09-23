@@ -44,13 +44,13 @@ Use `YOUR_*` placeholders — **never commit real API keys**.
 
 ## Code structure
 
-All logic lives in `src/main.rs`:
+CLI and launch logic live in `src/main.rs`; list rendering and checks live in `src/listing.rs`:
 
 | Section | Responsibility |
 |---|---|
 | `Args` | CLI argument parsing (clap) |
-| `Provider` / `Config` | TOML deserialization |
-| `config_path` / `load_providers` / `parse_config` | Config file loading + parsing |
+| `Profile` / `Config` | TOML deserialization |
+| `config_path` / `load_config` / `parse_config` | Config file loading + parsing |
 | `last_id_path` / `read_last_id` / `save_last_id` | Remember last selection |
 | `build_menu_items` | Three-column aligned display strings |
 | `build_launch_cmd` | Pure command construction (testable) |
@@ -75,7 +75,7 @@ This checks your `Cargo.lock` against the [RustSec Advisory Database](https://ru
 cargo test
 ```
 
-All tests live in `src/main.rs` as a `#[cfg(test)] mod tests` block.
+Unit tests live in `src/main.rs` and `src/listing.rs`. CLI integration tests in `tests/cli.rs` use isolated configuration directories and fake agent executables.
 
 ### Test categories
 
@@ -90,7 +90,7 @@ All tests live in `src/main.rs` as a `#[cfg(test)] mod tests` block.
 
 When adding or modifying functionality, follow these guidelines:
 
-1. **Test the pure logic, not the side effects.** Use `build_launch_cmd` / `parse_config` instead of testing through `launch` / `load_providers` which call `exec()` or `process::exit()`.
+1. **Test the pure logic, not the side effects.** Use `build_launch_cmd` / `parse_config` instead of testing through `launch` / `load_config` which call `exec()` or `process::exit()`.
 2. **Use the `make_provider` helper** for constructing test fixtures with sensible defaults.
 3. **Cover both happy path and error cases.** For parsing: valid TOML + invalid/missing fields. For command building: with/without resume, different executable types.
 4. **Test the embedded default config** — `parse_default_config_embedded` ensures the shipped `default_providers.toml` stays valid as you edit it.
@@ -140,4 +140,4 @@ git push origin v0.2.6
 
 ## Reporting issues
 
-Please include the output of `ccs -n -p <provider-id>` (dry-run, safe to share) to help diagnose command-construction issues.
+Please review the output of `ccs -n -p <profile-id>` for sensitive values before including it in a bug report.

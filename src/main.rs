@@ -7,20 +7,19 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
+mod listing;
+
 const DEFAULT_CONFIG: &str = include_str!("default_providers.toml");
 
-/// Max number of recently-used provider ids remembered.
+/// Max number of recently-used profile ids remembered.
 const RECENT_MAX: usize = 3;
-
-/// Env-key substrings (case-insensitive) whose values are masked by default.
-const MASK_KEYWORDS: &[&str] = &["token", "key", "secret", "password"];
 
 #[derive(Parser)]
 #[command(
@@ -36,16 +35,19 @@ struct Args {
     #[arg(short = 'r', long = "resume")]
     resume: bool,
 
-    /// Skip the menu and use a specific provider ID
-    #[arg(short = 'p', long = "provider", value_name = "ID")]
-    provider: Option<String>,
+    /// Skip the menu and use a specific profile ID
+    #[arg(short = 'p', long = "profile", value_name = "PROFILE_ID")]
+    profile: Option<String>,
+
+    #[arg(long = "provider", hide = true)]
+    legacy_provider: Option<String>,
 
     /// Print the command that would run, without executing
     #[arg(short = 'n', long = "dry-run")]
     dry_run: bool,
 
     /// Show full secret values in dry-run / list output (default: masked)
-    #[arg(long = "show-secrets")]
+    #[arg(long = "show-secrets", global = true)]
     show_secrets: bool,
 
     /// Arguments passed through to claude/codex
@@ -55,10 +57,14 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List all configured providers
-    List,
-    /// Validate config and check that executables exist in PATH
-    Validate,
+    /// List configured profiles
+    List {
+        /// Show environment configuration and local checks
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    #[command(name = "validate", hide = true)]
+    RemovedValidate,
     /// Open the config file in $EDITOR (falls back to vi)
     Edit,
 }
@@ -80,7 +86,7 @@ impl Executable {
 }
 
 #[derive(Deserialize, Clone, Debug)]
-struct Provider {
+struct Profile {
     id: String,
     /// Service provider name, e.g. "DeepSeek", "OpenAI"
     provider: String,
@@ -97,11 +103,15 @@ struct Provider {
     base_args: Vec<String>,
     #[serde(default)]
     env: HashMap<String, String>,
+    #[serde(flatten)]
+    unknown: HashMap<String, toml::Value>,
 }
 
 #[derive(Deserialize, Debug)]
 struct Config {
-    providers: Vec<Provider>,
+    providers: Vec<Profile>,
+    #[serde(flatten)]
+    unknown: HashMap<String, toml::Value>,
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -121,7 +131,7 @@ fn parse_config(content: &str) -> Result<Config, toml::de::Error> {
     toml::from_str(content)
 }
 
-fn load_providers() -> Vec<Provider> {
+fn load_config() -> Config {
     let path = config_path();
 
     if !path.exists() {
@@ -131,7 +141,10 @@ fn load_providers() -> Vec<Provider> {
         if let Err(e) = fs::write(&path, DEFAULT_CONFIG) {
             eprintln!("⚠️  Failed to write default config {}: {e}", path.display());
         } else {
-            eprintln!("📝 Default config created: {}\n", path.display());
+            eprintln!(
+                "📝 Example config created: {} — fill in your settings before use\n",
+                path.display()
+            );
         }
     }
 
@@ -145,12 +158,34 @@ fn load_providers() -> Vec<Provider> {
         std::process::exit(1);
     });
 
-    if config.providers.is_empty() {
-        eprintln!("❌ No providers defined in config");
+    if let Err(error) = validate_profiles(&config.providers) {
+        eprintln!("❌ Invalid config: {error}");
         std::process::exit(1);
     }
 
-    config.providers
+    config
+}
+
+fn validate_profiles(profiles: &[Profile]) -> Result<(), String> {
+    if profiles.is_empty() {
+        return Err("No profiles defined in config".to_string());
+    }
+    let mut ids = HashSet::new();
+    for (index, profile) in profiles.iter().enumerate() {
+        for (field, value) in [
+            ("id", &profile.id),
+            ("provider", &profile.provider),
+            ("model", &profile.model),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("providers[{index}].{field} must not be blank"));
+            }
+        }
+        if !ids.insert(&profile.id) {
+            return Err(format!("Duplicate profile ID: {:?}", profile.id));
+        }
+    }
+    Ok(())
 }
 
 // ── Recent selection ──────────────────────────────────────────────────────────
@@ -199,7 +234,7 @@ fn push_recent(id: &str) {
 
 /// Compute column widths for the interactive menu / list table.
 /// Returns `(exe_w, prov_w)` — the longest executable-name and provider-name lengths.
-fn compute_widths(providers: &[Provider]) -> (usize, usize) {
+fn compute_widths(providers: &[Profile]) -> (usize, usize) {
     let exe_w = providers
         .iter()
         .map(|p| p.executable.as_str().len())
@@ -214,7 +249,7 @@ fn compute_widths(providers: &[Provider]) -> (usize, usize) {
 }
 
 #[cfg(test)]
-fn build_menu_items(providers: &[Provider]) -> Vec<String> {
+fn build_menu_items(providers: &[Profile]) -> Vec<String> {
     let (exe_w, prov_w) = compute_widths(providers);
 
     providers
@@ -265,7 +300,7 @@ impl Drop for TerminalGuard {
     }
 }
 
-fn build_recent_provider_indices(providers: &[Provider], recent: &[String]) -> Vec<usize> {
+fn build_recent_provider_indices(providers: &[Profile], recent: &[String]) -> Vec<usize> {
     let mut indices = Vec::new();
     for id in recent {
         if let Some(idx) = providers.iter().position(|p| p.id == *id)
@@ -441,7 +476,7 @@ fn write_styled_menu_line(
 
 fn render_provider_menu(
     out: &mut impl Write,
-    providers: &[Provider],
+    providers: &[Profile],
     recent_indices: &[usize],
     state: &ProviderMenuState,
     previous_line_count: u16,
@@ -536,7 +571,7 @@ fn render_provider_menu(
 }
 
 fn select_provider_interactive(
-    providers: &[Provider],
+    providers: &[Profile],
     recent: &[String],
 ) -> io::Result<Option<usize>> {
     let recent_indices = build_recent_provider_indices(providers, recent);
@@ -590,17 +625,8 @@ fn select_provider_interactive(
 
 // ── Secret masking ────────────────────────────────────────────────────────────
 
-fn is_sensitive_key(key: &str) -> bool {
-    let lower = key.to_ascii_lowercase();
-    MASK_KEYWORDS.iter().any(|kw| lower.contains(kw))
-}
-
-fn mask_value(key: &str, value: &str) -> String {
-    if is_sensitive_key(key) {
-        format!("***masked (len={})***", value.chars().count())
-    } else {
-        value.to_string()
-    }
+fn mask_value(_key: &str, _value: &str) -> String {
+    "***masked***".to_string()
 }
 
 // ── Command building ─────────────────────────────────────────────────────────
@@ -612,7 +638,7 @@ struct LaunchCmd {
     env: Vec<(String, String)>,
 }
 
-fn build_launch_cmd(entry: &Provider, resume: bool, passthrough: &[String]) -> LaunchCmd {
+fn build_launch_cmd(entry: &Profile, resume: bool, passthrough: &[String]) -> LaunchCmd {
     let binary = entry.executable.as_str().to_string();
     let mut args = Vec::new();
 
@@ -650,7 +676,7 @@ fn shell_quote(s: &str) -> String {
 // ── Launch ────────────────────────────────────────────────────────────────────
 
 fn launch(
-    entry: &Provider,
+    entry: &Profile,
     resume: bool,
     dry_run: bool,
     show_secrets: bool,
@@ -698,79 +724,6 @@ fn launch(
 
 // ── Subcommands ───────────────────────────────────────────────────────────────
 
-fn cmd_list(providers: &[Provider], show_secrets: bool) {
-    let (exe_w, prov_w) = compute_widths(providers);
-    let id_w = providers
-        .iter()
-        .map(|p| p.id.len())
-        .max()
-        .unwrap_or(2)
-        .max("ID".len());
-    let model_w = providers
-        .iter()
-        .map(|p| p.model.len())
-        .max()
-        .unwrap_or(5)
-        .max("MODEL".len());
-
-    println!(
-        "{:<id_w$}  {:<exe_w$}  {:<prov_w$}  {:<model_w$}  RESUME",
-        "ID", "TOOL", "PROVIDER", "MODEL"
-    );
-    for p in providers {
-        println!(
-            "{:<id_w$}  {:<exe_w$}  {:<prov_w$}  {:<model_w$}  {}",
-            p.id,
-            p.executable.as_str(),
-            p.provider,
-            p.model,
-            if p.supports_resume { "yes" } else { "no" },
-        );
-    }
-
-    let with_env: Vec<&Provider> = providers.iter().filter(|p| !p.env.is_empty()).collect();
-    if !with_env.is_empty() {
-        let label = if show_secrets {
-            "env:"
-        } else {
-            "env (masked; pass --show-secrets to reveal):"
-        };
-        println!("\n{}", label);
-        for p in with_env {
-            println!("  [{}]", p.id);
-            let mut env: Vec<(&String, &String)> = p.env.iter().collect();
-            env.sort_by(|a, b| a.0.cmp(b.0));
-            for (k, v) in env {
-                let display = if show_secrets {
-                    v.clone()
-                } else {
-                    mask_value(k, v)
-                };
-                println!("    {}={}", k, display);
-            }
-        }
-    }
-}
-
-fn cmd_validate(providers: &[Provider]) -> i32 {
-    let mut ok = true;
-    for p in providers {
-        let exe = p.executable.as_str();
-        match Command::new("which").arg(exe).output() {
-            Ok(out) if out.status.success() => {
-                let path = String::from_utf8_lossy(&out.stdout);
-                let path = path.trim();
-                println!("✓ {:<20} {} ({})", p.id, exe, path);
-            }
-            _ => {
-                println!("✗ {:<20} {} — NOT FOUND in PATH", p.id, exe);
-                ok = false;
-            }
-        }
-    }
-    if ok { 0 } else { 1 }
-}
-
 fn cmd_edit() -> std::io::Result<()> {
     let path = config_path();
     if !path.exists() {
@@ -778,7 +731,10 @@ fn cmd_edit() -> std::io::Result<()> {
             fs::create_dir_all(parent)?;
         }
         fs::write(&path, DEFAULT_CONFIG)?;
-        eprintln!("📝 Default config created: {}\n", path.display());
+        eprintln!(
+            "📝 Example config created: {} — fill in your settings before use\n",
+            path.display()
+        );
     }
     let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
     let status = Command::new(&editor).arg(&path).status()?;
@@ -790,15 +746,46 @@ fn cmd_edit() -> std::io::Result<()> {
 fn main() {
     let args = Args::parse();
 
+    if args.legacy_provider.is_some() {
+        eprintln!("❌ --provider has been renamed to --profile");
+        std::process::exit(2);
+    }
+
     match args.command {
-        Some(Commands::List) => {
-            let providers = load_providers();
-            cmd_list(&providers, args.show_secrets);
-            std::process::exit(0);
+        Some(Commands::List { verbose }) => {
+            if args.show_secrets && !verbose {
+                eprintln!("❌ Use list --verbose with --show-secrets");
+                std::process::exit(2);
+            }
+            let config = load_config();
+            let stdout = io::stdout();
+            let is_terminal = stdout.is_terminal();
+            let width = if is_terminal {
+                terminal::size().ok().map(|(width, _)| width as usize)
+            } else {
+                None
+            };
+            let colors = is_terminal && menu_colors_enabled();
+            let result = listing::write_list(
+                &mut stdout.lock(),
+                &config,
+                verbose,
+                args.show_secrets,
+                width,
+                colors,
+            );
+            match result {
+                Ok(valid) => std::process::exit(if valid { 0 } else { 1 }),
+                Err(error) if error.kind() == io::ErrorKind::BrokenPipe => std::process::exit(0),
+                Err(error) => {
+                    eprintln!("❌ Failed to write list: {error}");
+                    std::process::exit(1);
+                }
+            }
         }
-        Some(Commands::Validate) => {
-            let providers = load_providers();
-            std::process::exit(cmd_validate(&providers));
+        Some(Commands::RemovedValidate) => {
+            eprintln!("❌ validate has moved to list --verbose");
+            std::process::exit(2);
         }
         Some(Commands::Edit) => {
             let _ = cmd_edit();
@@ -807,13 +794,13 @@ fn main() {
         None => {}
     }
 
-    let providers = load_providers();
+    let providers = load_config().providers;
 
-    let entry = if let Some(ref id) = args.provider {
+    let entry = if let Some(ref id) = args.profile {
         match providers.iter().find(|p| p.id == *id) {
             Some(p) => p.clone(),
             None => {
-                eprintln!("❌ Unknown provider ID: {id}");
+                eprintln!("❌ Unknown profile ID: {id}");
                 let ids: Vec<&str> = providers.iter().map(|p| p.id.as_str()).collect();
                 eprintln!("Available IDs: {}", ids.join(", "));
                 std::process::exit(1);
@@ -862,13 +849,26 @@ fn main() {
 mod tests {
     use super::*;
 
+    #[test]
+    fn cli_selects_profile_by_short_or_long_option() {
+        let short = Args::try_parse_from(["ccs", "-p", "deepseek"]).unwrap();
+        assert_eq!(short.profile.as_deref(), Some("deepseek"));
+
+        let long = Args::try_parse_from(["ccs", "--profile", "codex"]).unwrap();
+        assert_eq!(long.profile.as_deref(), Some("codex"));
+
+        let legacy = Args::try_parse_from(["ccs", "--provider", "deepseek"]).unwrap();
+        assert_eq!(legacy.legacy_provider.as_deref(), Some("deepseek"));
+        assert!(legacy.profile.is_none());
+    }
+
     fn make_provider(
         id: &str,
         exe: Executable,
         supports_resume: bool,
         resume_as_subcommand: bool,
-    ) -> Provider {
-        Provider {
+    ) -> Profile {
+        Profile {
             id: id.to_string(),
             provider: "TestProvider".to_string(),
             model: "test-model".to_string(),
@@ -877,6 +877,7 @@ mod tests {
             resume_as_subcommand,
             base_args: vec!["--flag".to_string()],
             env: HashMap::from([("KEY".to_string(), "value".to_string())]),
+            unknown: HashMap::new(),
         }
     }
 
@@ -1051,7 +1052,7 @@ executable = "claude"
     #[test]
     fn menu_items_aligned() {
         let providers = vec![
-            Provider {
+            Profile {
                 id: "a".to_string(),
                 provider: "DeepSeek".to_string(),
                 model: "v4-pro".to_string(),
@@ -1060,8 +1061,9 @@ executable = "claude"
                 resume_as_subcommand: false,
                 base_args: vec![],
                 env: HashMap::new(),
+                unknown: HashMap::new(),
             },
-            Provider {
+            Profile {
                 id: "b".to_string(),
                 provider: "OpenAI".to_string(),
                 model: "gpt-4o".to_string(),
@@ -1070,6 +1072,7 @@ executable = "claude"
                 resume_as_subcommand: false,
                 base_args: vec![],
                 env: HashMap::new(),
+                unknown: HashMap::new(),
             },
         ];
         let items = build_menu_items(&providers);
@@ -1082,7 +1085,7 @@ executable = "claude"
 
     #[test]
     fn menu_items_single_provider() {
-        let providers = vec![Provider {
+        let providers = vec![Profile {
             id: "solo".to_string(),
             provider: "Solo".to_string(),
             model: "m".to_string(),
@@ -1091,6 +1094,7 @@ executable = "claude"
             resume_as_subcommand: false,
             base_args: vec![],
             env: HashMap::new(),
+            unknown: HashMap::new(),
         }];
         let items = build_menu_items(&providers);
         assert_eq!(items.len(), 1);
@@ -1249,42 +1253,17 @@ executable = "claude"
     // ── Secret masking ───────────────────────────────────────────────────────
 
     #[test]
-    fn mask_value_plain_keys() {
-        assert_eq!(mask_value("ANTHROPIC_BASE_URL", "https://x"), "https://x");
-        assert_eq!(mask_value("CLAUDE_CODE_EFFORT_LEVEL", "max"), "max");
-        assert_eq!(mask_value("REGION", "us-east-1"), "us-east-1");
-    }
-
-    #[test]
-    fn mask_value_token_substring() {
-        let secret = "sk-1234567890abcdef"; // 19 chars
-        let masked = mask_value("ANTHROPIC_AUTH_TOKEN", secret);
-        assert!(masked.starts_with("***masked"));
-        assert!(masked.contains("len=19"));
-        assert!(!masked.contains("sk-"));
-        assert!(!masked.contains("1234567890"));
-    }
-
-    #[test]
-    fn mask_value_key_substring_case_insensitive() {
-        assert!(mask_value("openai_api_key", "secret").contains("masked"));
-        assert!(mask_value("MIMO_API_KEY", "secret").contains("masked"));
-        assert!(mask_value("API_KEY", "x").contains("masked"));
-        assert!(mask_value("private-key", "x").contains("masked"));
-    }
-
-    #[test]
-    fn mask_value_secret_and_password() {
-        assert!(mask_value("DB_PASSWORD", "hunter2").contains("masked"));
-        assert!(mask_value("client_secret", "x").contains("masked"));
-        assert!(mask_value("SecretKey", "x").contains("masked"));
-    }
-
-    #[test]
-    fn mask_value_no_match() {
-        assert_eq!(mask_value("PATH", "/usr/bin"), "/usr/bin");
-        assert_eq!(mask_value("HOME", "/root"), "/root");
-        assert_eq!(mask_value("LANG", "en_US"), "en_US");
+    fn mask_all_environment_values() {
+        for key in [
+            "API_KEY",
+            "API_CREDENTIAL",
+            "PATH",
+            "ANTHROPIC_BASE_URL",
+            "REGION",
+        ] {
+            assert_eq!(mask_value(key, "sensitive-value"), "***masked***");
+        }
+        assert_eq!(mask_value("EMPTY", ""), "***masked***");
     }
 
     // ── compute_widths ───────────────────────────────────────────────────────
@@ -1293,7 +1272,7 @@ executable = "claude"
     fn compute_widths_multi() {
         let providers = vec![
             make_provider("a", Executable::Claude, false, false),
-            Provider {
+            Profile {
                 id: "b".to_string(),
                 provider: "OpenAI".to_string(),
                 model: "gpt-4o".to_string(),
@@ -1302,6 +1281,7 @@ executable = "claude"
                 resume_as_subcommand: false,
                 base_args: vec![],
                 env: HashMap::new(),
+                unknown: HashMap::new(),
             },
         ];
         let (exe_w, prov_w) = compute_widths(&providers);
