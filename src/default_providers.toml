@@ -1,10 +1,10 @@
 # ~/.config/ccs/config.toml
 #
-# ccs provider configuration.
-# Each [[providers]] block defines one selectable entry.
+# ccs profile configuration.
+# Each [[providers]] block defines one selectable profile.
 #
 # Fields:
-#   id                   - Unique identifier; used with the -p / --provider flag
+#   id                   - Unique identifier; used with the -p / --profile flag
 #   provider             - Display name of the service (shown in column 2)
 #   model                - Model name (shown in column 3)
 #   executable           - Command to launch: "claude" or "codex"

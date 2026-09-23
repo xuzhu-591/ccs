@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-23
+
+### Changed
+- Consolidate profile inspection into `ccs list`: ID, provider, model, and agent columns by default; environment configuration and local checks with `--verbose`.
+- Replace `ccs validate` with `ccs list --verbose`, and rename `--provider` to `--profile` while retaining `-p`. Removed commands/options report migration instructions.
+- Align Unicode columns, adapt to narrow terminals, and add terminal colors with `NO_COLOR` support.
+- Mask all environment values in verbose and dry-run output unless `--show-secrets` is supplied.
+
+### Fixed
+- Check executables against each profile's effective PATH without requiring `which`.
+- Reject duplicate profile IDs and blank required display fields; report unknown configuration fields in verbose checks.
+
 ## [0.2.10] - 2026-07-02
 
 ### Added
@@ -93,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Remembers last-used provider across sessions.
 - Single static binary, zero runtime dependencies.
 
-[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.2.10...HEAD
+[Unreleased]: https://github.com/xuzhu-591/ccs/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/xuzhu-591/ccs/compare/v0.2.10...v0.3.0
 [0.2.10]: https://github.com/xuzhu-591/ccs/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/xuzhu-591/ccs/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/xuzhu-591/ccs/compare/v0.2.7...v0.2.8
