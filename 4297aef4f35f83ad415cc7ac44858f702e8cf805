@@ -1,0 +1,30 @@
+tests/cli.rs
+  bd77a00002925c26 7,85,111,139,148,171,202,231,239-240,248,302-306,309-373
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "4297aef4f35f83ad415cc7ac44858f702e8cf805",
+  "prompts": {
+    "bd77a00002925c26": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cc58-ff67-7353-a68b-d1ea6847d148",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "xuzhu-591 <xuzhu-591@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 76,
+      "total_deletions": 11,
+      "accepted_lines": 82,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "tests/cli.rs": {
+          "additions": 76,
+          "deletions": 11,
+          "accepted_lines": 82
+        }
+      }
+    }
+  }
+}
