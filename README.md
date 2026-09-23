@@ -230,7 +230,7 @@ Add a new `[[providers]]` block to `~/.config/ccs/config.toml`:
 
 ```toml
 [[providers]]
-id              = "my-provider"
+id              = "my-profile"
 provider        = "MyService"
 model           = "my-model-v1"
 executable      = "claude"
@@ -251,7 +251,7 @@ ccs/
 ├── src/
 │   ├── main.rs                # CLI, configuration, menu, and launching
 │   ├── listing.rs             # List rendering and local checks
-│   └── default_providers.toml # Template config embedded in the binary
+│   └── default_profiles.toml  # Template config embedded in the binary
 ├── tests/cli.rs               # CLI integration tests
 ├── Cargo.toml
 ├── Cargo.lock

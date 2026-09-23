@@ -21,14 +21,14 @@ Run the binary directly from the build output:
 > ⚠️  Install as `ccs`, **never as `cc`** — `cc` is the system C compiler and shadowing it will
 > break `cargo build` for every Rust project on your machine.
 
-## Adding a new provider (config only — no code change)
+## Adding a new profile (config only — no code change)
 
-Most contributions can be done purely in config. Add your provider example to
-`src/default_providers.toml` with placeholder keys:
+Most contributions can be done purely in config. Add your profile example to
+`src/default_profiles.toml` with placeholder keys:
 
 ```toml
 [[providers]]
-id              = "my-provider"
+id              = "my-profile"
 provider        = "MyService"
 model           = "my-model-v1"
 executable      = "claude"
@@ -39,6 +39,8 @@ base_args       = ["--dangerously-skip-permissions"]
 ANTHROPIC_BASE_URL   = "https://api.myservice.com/anthropic"
 ANTHROPIC_AUTH_TOKEN = "YOUR_MYSERVICE_API_KEY"
 ```
+
+Each block defines a profile. The `providers` / `providers.env` TOML keys are retained for configuration compatibility; `provider` names the service.
 
 Use `YOUR_*` placeholders — **never commit real API keys**.
 
@@ -83,7 +85,7 @@ Unit tests live in `src/main.rs` and `src/listing.rs`. CLI integration tests in 
 |---|---|---|
 | Config parsing | TOML → struct deserialization, required/optional fields, error cases | `parse_minimal_config`, `parse_invalid_executable` |
 | Command building | Arg ordering, resume logic, env injection, passthrough | `build_cmd_claude_with_resume`, `build_cmd_codex_resume_as_subcommand` |
-| Menu display | Column alignment, single/multi provider formatting | `menu_items_aligned` |
+| Menu display | Column alignment, single/multi profile formatting | `menu_items_aligned` |
 | Shell quoting | Special character handling for dry-run output | `shell_quote_with_spaces` |
 
 ### Writing new tests
@@ -91,9 +93,9 @@ Unit tests live in `src/main.rs` and `src/listing.rs`. CLI integration tests in 
 When adding or modifying functionality, follow these guidelines:
 
 1. **Test the pure logic, not the side effects.** Use `build_launch_cmd` / `parse_config` instead of testing through `launch` / `load_config` which call `exec()` or `process::exit()`.
-2. **Use the `make_provider` helper** for constructing test fixtures with sensible defaults.
+2. **Use the `make_profile` helper** for constructing test fixtures with sensible defaults.
 3. **Cover both happy path and error cases.** For parsing: valid TOML + invalid/missing fields. For command building: with/without resume, different executable types.
-4. **Test the embedded default config** — `parse_default_config_embedded` ensures the shipped `default_providers.toml` stays valid as you edit it.
+4. **Test the embedded default config** — `parse_default_config_embedded` ensures the shipped `default_profiles.toml` stays valid as you edit it.
 5. **Name tests clearly** — `{function}_{scenario}` pattern, e.g. `build_cmd_resume_not_supported`.
 
 ### CI
@@ -134,7 +136,7 @@ git push origin v0.2.6
 - Keep PRs focused — one feature or fix per PR
 - Run `cargo fmt`, `cargo clippy`, and `cargo test` before submitting
 - Test with `--dry-run` (`-n`) to verify command construction manually
-- Do not commit real API keys or tokens — use `YOUR_*` placeholders in `default_providers.toml`
+- Do not commit real API keys or tokens — use `YOUR_*` placeholders in `default_profiles.toml`
 - Update `README.md` if you add a new flag or change config fields
 - Add tests for new logic (config parsing, command building, display formatting)
 

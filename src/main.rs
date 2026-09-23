@@ -16,7 +16,7 @@ use std::process::Command;
 
 mod listing;
 
-const DEFAULT_CONFIG: &str = include_str!("default_providers.toml");
+const DEFAULT_CONFIG: &str = include_str!("default_profiles.toml");
 
 /// Max number of recently-used profile ids remembered.
 const RECENT_MAX: usize = 3;
@@ -109,7 +109,8 @@ struct Profile {
 
 #[derive(Deserialize, Debug)]
 struct Config {
-    providers: Vec<Profile>,
+    #[serde(rename = "providers")]
+    profiles: Vec<Profile>,
     #[serde(flatten)]
     unknown: HashMap<String, toml::Value>,
 }
@@ -158,7 +159,7 @@ fn load_config() -> Config {
         std::process::exit(1);
     });
 
-    if let Err(error) = validate_profiles(&config.providers) {
+    if let Err(error) = validate_profiles(&config.profiles) {
         eprintln!("❌ Invalid config: {error}");
         std::process::exit(1);
     }
@@ -234,25 +235,21 @@ fn push_recent(id: &str) {
 
 /// Compute column widths for the interactive menu / list table.
 /// Returns `(exe_w, prov_w)` — the longest executable-name and provider-name lengths.
-fn compute_widths(providers: &[Profile]) -> (usize, usize) {
-    let exe_w = providers
+fn compute_widths(profiles: &[Profile]) -> (usize, usize) {
+    let exe_w = profiles
         .iter()
         .map(|p| p.executable.as_str().len())
         .max()
         .unwrap_or(6);
-    let prov_w = providers
-        .iter()
-        .map(|p| p.provider.len())
-        .max()
-        .unwrap_or(8);
+    let prov_w = profiles.iter().map(|p| p.provider.len()).max().unwrap_or(8);
     (exe_w, prov_w)
 }
 
 #[cfg(test)]
-fn build_menu_items(providers: &[Profile]) -> Vec<String> {
-    let (exe_w, prov_w) = compute_widths(providers);
+fn build_menu_items(profiles: &[Profile]) -> Vec<String> {
+    let (exe_w, prov_w) = compute_widths(profiles);
 
-    providers
+    profiles
         .iter()
         .map(|p| {
             format!(
@@ -268,14 +265,14 @@ fn build_menu_items(providers: &[Profile]) -> Vec<String> {
 // ── Interactive menu ─────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ProviderList {
+enum ProfileList {
     Recent,
     All,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ProviderMenuState {
-    list: ProviderList,
+struct ProfileMenuState {
+    list: ProfileList,
     recent_index: usize,
     all_index: usize,
 }
@@ -300,10 +297,10 @@ impl Drop for TerminalGuard {
     }
 }
 
-fn build_recent_provider_indices(providers: &[Profile], recent: &[String]) -> Vec<usize> {
+fn build_recent_profile_indices(profiles: &[Profile], recent: &[String]) -> Vec<usize> {
     let mut indices = Vec::new();
     for id in recent {
-        if let Some(idx) = providers.iter().position(|p| p.id == *id)
+        if let Some(idx) = profiles.iter().position(|p| p.id == *id)
             && !indices.contains(&idx)
         {
             indices.push(idx);
@@ -312,52 +309,52 @@ fn build_recent_provider_indices(providers: &[Profile], recent: &[String]) -> Ve
     indices
 }
 
-fn default_provider_menu_state(recent_indices: &[usize]) -> ProviderMenuState {
+fn default_profile_menu_state(recent_indices: &[usize]) -> ProfileMenuState {
     if recent_indices.is_empty() {
-        ProviderMenuState {
-            list: ProviderList::All,
+        ProfileMenuState {
+            list: ProfileList::All,
             recent_index: 0,
             all_index: 0,
         }
     } else {
-        ProviderMenuState {
-            list: ProviderList::Recent,
+        ProfileMenuState {
+            list: ProfileList::Recent,
             recent_index: 0,
             all_index: recent_indices[0],
         }
     }
 }
 
-fn selected_provider_index(state: &ProviderMenuState, recent_indices: &[usize]) -> usize {
+fn selected_profile_index(state: &ProfileMenuState, recent_indices: &[usize]) -> usize {
     match state.list {
-        ProviderList::Recent => recent_indices[state.recent_index],
-        ProviderList::All => state.all_index,
+        ProfileList::Recent => recent_indices[state.recent_index],
+        ProfileList::All => state.all_index,
     }
 }
 
-fn switch_provider_list(
-    state: &mut ProviderMenuState,
-    target: ProviderList,
+fn switch_profile_list(
+    state: &mut ProfileMenuState,
+    target: ProfileList,
     recent_indices: &[usize],
-    provider_count: usize,
+    profile_count: usize,
 ) {
-    if target == ProviderList::Recent && recent_indices.is_empty() {
+    if target == ProfileList::Recent && recent_indices.is_empty() {
         return;
     }
 
-    let current_provider = selected_provider_index(state, recent_indices);
+    let current_profile = selected_profile_index(state, recent_indices);
     state.list = target;
 
     match target {
-        ProviderList::Recent => {
+        ProfileList::Recent => {
             state.recent_index = recent_indices
                 .iter()
-                .position(|idx| *idx == current_provider)
+                .position(|idx| *idx == current_profile)
                 .unwrap_or(0);
         }
-        ProviderList::All => {
-            state.all_index = if current_provider < provider_count {
-                current_provider
+        ProfileList::All => {
+            state.all_index = if current_profile < profile_count {
+                current_profile
             } else {
                 0
             };
@@ -365,15 +362,15 @@ fn switch_provider_list(
     }
 }
 
-fn move_provider_menu_selection(
-    state: &mut ProviderMenuState,
+fn move_profile_menu_selection(
+    state: &mut ProfileMenuState,
     delta: isize,
     recent_indices: &[usize],
-    provider_count: usize,
+    profile_count: usize,
 ) {
     let (current, len) = match state.list {
-        ProviderList::Recent => (state.recent_index, recent_indices.len()),
-        ProviderList::All => (state.all_index, provider_count),
+        ProfileList::Recent => (state.recent_index, recent_indices.len()),
+        ProfileList::All => (state.all_index, profile_count),
     };
     if len == 0 {
         return;
@@ -381,20 +378,20 @@ fn move_provider_menu_selection(
 
     let next = (current as isize + delta).rem_euclid(len as isize) as usize;
     match state.list {
-        ProviderList::Recent => {
+        ProfileList::Recent => {
             state.recent_index = next;
             state.all_index = recent_indices[next];
         }
-        ProviderList::All => {
+        ProfileList::All => {
             state.all_index = next;
         }
     }
 }
 
-fn provider_list_label(list: ProviderList) -> &'static str {
+fn profile_list_label(list: ProfileList) -> &'static str {
     match list {
-        ProviderList::Recent => "Recent",
-        ProviderList::All => "All",
+        ProfileList::Recent => "Recent",
+        ProfileList::All => "All",
     }
 }
 
@@ -474,11 +471,11 @@ fn write_styled_menu_line(
     write!(out, "\r\n")
 }
 
-fn render_provider_menu(
+fn render_profile_menu(
     out: &mut impl Write,
-    providers: &[Profile],
+    profiles: &[Profile],
     recent_indices: &[usize],
-    state: &ProviderMenuState,
+    state: &ProfileMenuState,
     previous_line_count: u16,
 ) -> io::Result<u16> {
     if previous_line_count > 0 {
@@ -488,7 +485,7 @@ fn render_provider_menu(
 
     let width = terminal::size().map(|(width, _)| width).unwrap_or(100);
     let colors_enabled = menu_colors_enabled();
-    let list_label = format!("[{}]", provider_list_label(state.list));
+    let list_label = format!("[{}]", profile_list_label(state.list));
     write_styled_menu_line(
         out,
         &[
@@ -502,23 +499,23 @@ fn render_provider_menu(
         colors_enabled,
     )?;
 
-    let (exe_w, prov_w) = compute_widths(providers);
+    let (exe_w, prov_w) = compute_widths(profiles);
     let header = format!("  {:<exe_w$}   {:<prov_w$}   MODEL", "TOOL", "PROVIDER");
     write_styled_menu_line(out, &[(&header, STYLE_DIM_BOLD)], width, colors_enabled)?;
 
     let active_indices: Vec<usize> = match state.list {
-        ProviderList::Recent => recent_indices.to_vec(),
-        ProviderList::All => (0..providers.len()).collect(),
+        ProfileList::Recent => recent_indices.to_vec(),
+        ProfileList::All => (0..profiles.len()).collect(),
     };
     let line_count = active_indices.len().saturating_add(4) as u16;
-    let selected = selected_provider_index(state, recent_indices);
+    let selected = selected_profile_index(state, recent_indices);
 
     for idx in active_indices {
-        let provider = &providers[idx];
+        let profile = &profiles[idx];
         let is_selected = idx == selected;
         let marker = if is_selected { "❯ " } else { "  " };
-        let exe = format!("{:<exe_w$}", provider.executable.as_str());
-        let provider_name = format!("{:<prov_w$}", provider.provider);
+        let exe = format!("{:<exe_w$}", profile.executable.as_str());
+        let provider_name = format!("{:<prov_w$}", profile.provider);
         let row_style = if is_selected {
             STYLE_DEFAULT_BOLD
         } else {
@@ -543,7 +540,7 @@ fn render_provider_menu(
                 ("   ", STYLE_DEFAULT),
                 (&provider_name, provider_style),
                 ("   ", STYLE_DEFAULT),
-                (&provider.model, model_style),
+                (&profile.model, model_style),
             ],
             width,
             colors_enabled,
@@ -570,20 +567,20 @@ fn render_provider_menu(
     out.flush().map(|_| line_count)
 }
 
-fn select_provider_interactive(
-    providers: &[Profile],
+fn select_profile_interactive(
+    profiles: &[Profile],
     recent: &[String],
 ) -> io::Result<Option<usize>> {
-    let recent_indices = build_recent_provider_indices(providers, recent);
-    let mut state = default_provider_menu_state(&recent_indices);
+    let recent_indices = build_recent_profile_indices(profiles, recent);
+    let mut state = default_profile_menu_state(&recent_indices);
     let _guard = TerminalGuard::new()?;
     let mut stderr = io::stderr();
     let mut rendered_lines = 0;
 
     loop {
-        rendered_lines = render_provider_menu(
+        rendered_lines = render_profile_menu(
             &mut stderr,
-            providers,
+            profiles,
             &recent_indices,
             &state,
             rendered_lines,
@@ -595,25 +592,25 @@ fn select_provider_interactive(
         {
             match code {
                 KeyCode::Up => {
-                    move_provider_menu_selection(&mut state, -1, &recent_indices, providers.len())
+                    move_profile_menu_selection(&mut state, -1, &recent_indices, profiles.len())
                 }
                 KeyCode::Down => {
-                    move_provider_menu_selection(&mut state, 1, &recent_indices, providers.len())
+                    move_profile_menu_selection(&mut state, 1, &recent_indices, profiles.len())
                 }
-                KeyCode::Left => switch_provider_list(
+                KeyCode::Left => switch_profile_list(
                     &mut state,
-                    ProviderList::Recent,
+                    ProfileList::Recent,
                     &recent_indices,
-                    providers.len(),
+                    profiles.len(),
                 ),
-                KeyCode::Right => switch_provider_list(
+                KeyCode::Right => switch_profile_list(
                     &mut state,
-                    ProviderList::All,
+                    ProfileList::All,
                     &recent_indices,
-                    providers.len(),
+                    profiles.len(),
                 ),
                 KeyCode::Enter => {
-                    return Ok(Some(selected_provider_index(&state, &recent_indices)));
+                    return Ok(Some(selected_profile_index(&state, &recent_indices)));
                 }
                 KeyCode::Esc => return Ok(None),
                 KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => return Ok(None),
@@ -794,21 +791,21 @@ fn main() {
         None => {}
     }
 
-    let providers = load_config().providers;
+    let profiles = load_config().profiles;
 
     let entry = if let Some(ref id) = args.profile {
-        match providers.iter().find(|p| p.id == *id) {
+        match profiles.iter().find(|p| p.id == *id) {
             Some(p) => p.clone(),
             None => {
                 eprintln!("❌ Unknown profile ID: {id}");
-                let ids: Vec<&str> = providers.iter().map(|p| p.id.as_str()).collect();
+                let ids: Vec<&str> = profiles.iter().map(|p| p.id.as_str()).collect();
                 eprintln!("Available IDs: {}", ids.join(", "));
                 std::process::exit(1);
             }
         }
     } else {
         let recent = read_recent();
-        let selection = match select_provider_interactive(&providers, &recent) {
+        let selection = match select_profile_interactive(&profiles, &recent) {
             Ok(opt) => opt,
             Err(io_err) => {
                 eprintln!("❌ I/O error during selection: {io_err}");
@@ -817,7 +814,7 @@ fn main() {
         };
 
         match selection {
-            Some(idx) => providers[idx].clone(),
+            Some(idx) => profiles[idx].clone(),
             None => {
                 eprintln!("Cancelled");
                 std::process::exit(0);
@@ -862,7 +859,7 @@ mod tests {
         assert!(legacy.profile.is_none());
     }
 
-    fn make_provider(
+    fn make_profile(
         id: &str,
         exe: Executable,
         supports_resume: bool,
@@ -893,12 +890,12 @@ model = "m1"
 executable = "claude"
 "#;
         let config = parse_config(toml).unwrap();
-        assert_eq!(config.providers.len(), 1);
-        assert_eq!(config.providers[0].id, "test");
-        assert_eq!(config.providers[0].executable, Executable::Claude);
-        assert!(!config.providers[0].supports_resume);
-        assert!(config.providers[0].base_args.is_empty());
-        assert!(config.providers[0].env.is_empty());
+        assert_eq!(config.profiles.len(), 1);
+        assert_eq!(config.profiles[0].id, "test");
+        assert_eq!(config.profiles[0].executable, Executable::Claude);
+        assert!(!config.profiles[0].supports_resume);
+        assert!(config.profiles[0].base_args.is_empty());
+        assert!(config.profiles[0].env.is_empty());
     }
 
     #[test]
@@ -917,7 +914,7 @@ ANTHROPIC_BASE_URL = "https://api.deepseek.com/anthropic"
 ANTHROPIC_AUTH_TOKEN = "YOUR_KEY"
 "#;
         let config = parse_config(toml).unwrap();
-        let p = &config.providers[0];
+        let p = &config.profiles[0];
         assert_eq!(p.id, "ds");
         assert!(p.supports_resume);
         assert!(!p.resume_as_subcommand);
@@ -929,7 +926,7 @@ ANTHROPIC_AUTH_TOKEN = "YOUR_KEY"
     }
 
     #[test]
-    fn parse_multiple_providers() {
+    fn parse_multiple_profiles() {
         let toml = r#"
 [[providers]]
 id = "a"
@@ -946,9 +943,9 @@ supports_resume = true
 resume_as_subcommand = true
 "#;
         let config = parse_config(toml).unwrap();
-        assert_eq!(config.providers.len(), 2);
-        assert_eq!(config.providers[1].executable, Executable::Codex);
-        assert!(config.providers[1].resume_as_subcommand);
+        assert_eq!(config.profiles.len(), 2);
+        assert_eq!(config.profiles[1].executable, Executable::Codex);
+        assert!(config.profiles[1].resume_as_subcommand);
     }
 
     #[test]
@@ -975,17 +972,17 @@ executable = "claude"
     }
 
     #[test]
-    fn parse_empty_providers() {
+    fn parse_empty_profiles() {
         let toml = "providers = []\n";
         let config = parse_config(toml).unwrap();
-        assert!(config.providers.is_empty());
+        assert!(config.profiles.is_empty());
     }
 
     #[test]
     fn parse_default_config_embedded() {
         let config = parse_config(DEFAULT_CONFIG).unwrap();
-        assert!(!config.providers.is_empty());
-        for p in &config.providers {
+        assert!(!config.profiles.is_empty());
+        for p in &config.profiles {
             assert!(!p.id.is_empty());
             assert!(!p.model.is_empty());
         }
@@ -995,7 +992,7 @@ executable = "claude"
 
     #[test]
     fn build_cmd_claude_no_resume() {
-        let p = make_provider("test", Executable::Claude, true, false);
+        let p = make_profile("test", Executable::Claude, true, false);
         let cmd = build_launch_cmd(&p, false, &[]);
         assert_eq!(cmd.binary, "claude");
         assert_eq!(cmd.args, vec!["--flag"]);
@@ -1004,14 +1001,14 @@ executable = "claude"
 
     #[test]
     fn build_cmd_claude_with_resume() {
-        let p = make_provider("test", Executable::Claude, true, false);
+        let p = make_profile("test", Executable::Claude, true, false);
         let cmd = build_launch_cmd(&p, true, &[]);
         assert_eq!(cmd.args, vec!["--flag", "-r"]);
     }
 
     #[test]
     fn build_cmd_codex_resume_as_subcommand() {
-        let p = make_provider("test", Executable::Codex, true, true);
+        let p = make_profile("test", Executable::Codex, true, true);
         let cmd = build_launch_cmd(&p, true, &[]);
         assert_eq!(cmd.binary, "codex");
         assert_eq!(cmd.args[0], "resume");
@@ -1021,7 +1018,7 @@ executable = "claude"
 
     #[test]
     fn build_cmd_resume_not_supported() {
-        let p = make_provider("test", Executable::Claude, false, false);
+        let p = make_profile("test", Executable::Claude, false, false);
         let cmd = build_launch_cmd(&p, true, &[]);
         assert_eq!(cmd.args, vec!["--flag"]);
         assert!(!cmd.args.contains(&"-r".to_string()));
@@ -1029,7 +1026,7 @@ executable = "claude"
 
     #[test]
     fn build_cmd_passthrough_args() {
-        let p = make_provider("test", Executable::Claude, false, false);
+        let p = make_profile("test", Executable::Claude, false, false);
         let pass = vec!["--print".to_string(), "hello world".to_string()];
         let cmd = build_launch_cmd(&p, false, &pass);
         assert_eq!(cmd.args, vec!["--flag", "--print", "hello world"]);
@@ -1037,7 +1034,7 @@ executable = "claude"
 
     #[test]
     fn build_cmd_env_sorted() {
-        let mut p = make_provider("test", Executable::Claude, false, false);
+        let mut p = make_profile("test", Executable::Claude, false, false);
         p.env = HashMap::from([
             ("Z_VAR".to_string(), "z".to_string()),
             ("A_VAR".to_string(), "a".to_string()),
@@ -1051,7 +1048,7 @@ executable = "claude"
 
     #[test]
     fn menu_items_aligned() {
-        let providers = vec![
+        let profiles = vec![
             Profile {
                 id: "a".to_string(),
                 provider: "DeepSeek".to_string(),
@@ -1075,7 +1072,7 @@ executable = "claude"
                 unknown: HashMap::new(),
             },
         ];
-        let items = build_menu_items(&providers);
+        let items = build_menu_items(&profiles);
         assert_eq!(items.len(), 2);
         // Both lines should have the same length for the fixed columns
         let col1_end: usize = items[0].find("DeepSeek").unwrap();
@@ -1084,8 +1081,8 @@ executable = "claude"
     }
 
     #[test]
-    fn menu_items_single_provider() {
-        let providers = vec![Profile {
+    fn menu_items_single_profile() {
+        let profiles = vec![Profile {
             id: "solo".to_string(),
             provider: "Solo".to_string(),
             model: "m".to_string(),
@@ -1096,7 +1093,7 @@ executable = "claude"
             env: HashMap::new(),
             unknown: HashMap::new(),
         }];
-        let items = build_menu_items(&providers);
+        let items = build_menu_items(&profiles);
         assert_eq!(items.len(), 1);
         assert!(items[0].contains("claude"));
         assert!(items[0].contains("Solo"));
@@ -1104,11 +1101,11 @@ executable = "claude"
     }
 
     #[test]
-    fn recent_provider_indices_filter_missing_and_duplicates() {
-        let providers = vec![
-            make_provider("a", Executable::Claude, false, false),
-            make_provider("b", Executable::Claude, false, false),
-            make_provider("c", Executable::Claude, false, false),
+    fn recent_profile_indices_filter_missing_and_duplicates() {
+        let profiles = vec![
+            make_profile("a", Executable::Claude, false, false),
+            make_profile("b", Executable::Claude, false, false),
+            make_profile("c", Executable::Claude, false, false),
         ];
         let recent = vec![
             "c".to_string(),
@@ -1117,77 +1114,77 @@ executable = "claude"
             "c".to_string(),
         ];
 
-        let indices = build_recent_provider_indices(&providers, &recent);
+        let indices = build_recent_profile_indices(&profiles, &recent);
         assert_eq!(indices, vec![2, 1]);
     }
 
     #[test]
-    fn menu_defaults_to_recent_first_provider() {
-        let state = default_provider_menu_state(&[2, 1]);
+    fn menu_defaults_to_recent_first_profile() {
+        let state = default_profile_menu_state(&[2, 1]);
 
-        assert_eq!(state.list, ProviderList::Recent);
+        assert_eq!(state.list, ProfileList::Recent);
         assert_eq!(state.recent_index, 0);
         assert_eq!(state.all_index, 2);
-        assert_eq!(selected_provider_index(&state, &[2, 1]), 2);
+        assert_eq!(selected_profile_index(&state, &[2, 1]), 2);
     }
 
     #[test]
     fn menu_defaults_to_all_without_recent() {
-        let state = default_provider_menu_state(&[]);
+        let state = default_profile_menu_state(&[]);
 
-        assert_eq!(state.list, ProviderList::All);
+        assert_eq!(state.list, ProfileList::All);
         assert_eq!(state.recent_index, 0);
         assert_eq!(state.all_index, 0);
     }
 
     #[test]
-    fn menu_switch_preserves_current_provider_when_present() {
+    fn menu_switch_preserves_current_profile_when_present() {
         let recent_indices = vec![2, 1];
-        let mut state = default_provider_menu_state(&recent_indices);
+        let mut state = default_profile_menu_state(&recent_indices);
 
-        switch_provider_list(&mut state, ProviderList::All, &recent_indices, 3);
-        assert_eq!(state.list, ProviderList::All);
+        switch_profile_list(&mut state, ProfileList::All, &recent_indices, 3);
+        assert_eq!(state.list, ProfileList::All);
         assert_eq!(state.all_index, 2);
 
-        move_provider_menu_selection(&mut state, -1, &recent_indices, 3);
+        move_profile_menu_selection(&mut state, -1, &recent_indices, 3);
         assert_eq!(state.all_index, 1);
 
-        switch_provider_list(&mut state, ProviderList::Recent, &recent_indices, 3);
-        assert_eq!(state.list, ProviderList::Recent);
+        switch_profile_list(&mut state, ProfileList::Recent, &recent_indices, 3);
+        assert_eq!(state.list, ProfileList::Recent);
         assert_eq!(state.recent_index, 1);
-        assert_eq!(selected_provider_index(&state, &recent_indices), 1);
+        assert_eq!(selected_profile_index(&state, &recent_indices), 1);
     }
 
     #[test]
-    fn menu_switch_to_recent_falls_back_to_first_recent_provider() {
+    fn menu_switch_to_recent_falls_back_to_first_recent_profile() {
         let recent_indices = vec![2];
-        let mut state = ProviderMenuState {
-            list: ProviderList::All,
+        let mut state = ProfileMenuState {
+            list: ProfileList::All,
             recent_index: 0,
             all_index: 1,
         };
 
-        switch_provider_list(&mut state, ProviderList::Recent, &recent_indices, 3);
+        switch_profile_list(&mut state, ProfileList::Recent, &recent_indices, 3);
 
-        assert_eq!(state.list, ProviderList::Recent);
+        assert_eq!(state.list, ProfileList::Recent);
         assert_eq!(state.recent_index, 0);
-        assert_eq!(selected_provider_index(&state, &recent_indices), 2);
+        assert_eq!(selected_profile_index(&state, &recent_indices), 2);
     }
 
     #[test]
     fn menu_move_wraps_and_syncs_recent_selection_to_all_index() {
         let recent_indices = vec![2, 1];
-        let mut state = ProviderMenuState {
-            list: ProviderList::All,
+        let mut state = ProfileMenuState {
+            list: ProfileList::All,
             recent_index: 0,
             all_index: 0,
         };
 
-        move_provider_menu_selection(&mut state, -1, &recent_indices, 3);
+        move_profile_menu_selection(&mut state, -1, &recent_indices, 3);
         assert_eq!(state.all_index, 2);
 
-        switch_provider_list(&mut state, ProviderList::Recent, &recent_indices, 3);
-        move_provider_menu_selection(&mut state, 1, &recent_indices, 3);
+        switch_profile_list(&mut state, ProfileList::Recent, &recent_indices, 3);
+        move_profile_menu_selection(&mut state, 1, &recent_indices, 3);
 
         assert_eq!(state.recent_index, 1);
         assert_eq!(state.all_index, 1);
@@ -1270,8 +1267,8 @@ executable = "claude"
 
     #[test]
     fn compute_widths_multi() {
-        let providers = vec![
-            make_provider("a", Executable::Claude, false, false),
+        let profiles = vec![
+            make_profile("a", Executable::Claude, false, false),
             Profile {
                 id: "b".to_string(),
                 provider: "OpenAI".to_string(),
@@ -1284,7 +1281,7 @@ executable = "claude"
                 unknown: HashMap::new(),
             },
         ];
-        let (exe_w, prov_w) = compute_widths(&providers);
+        let (exe_w, prov_w) = compute_widths(&profiles);
         // claude (6) > codex (5), so width is 6
         assert_eq!(exe_w, "claude".len());
         // "TestProvider" (12) > "OpenAI" (5)
